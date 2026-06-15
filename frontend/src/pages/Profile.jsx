@@ -10,12 +10,9 @@ import ProfileBadges from "../components/profile/ProfileBadges";
 import Analytics from "../components/profile/Analytics";
 import RecentActivity from "../components/profile/RecentActivity";
 import QuickLinks from "../components/profile/QuickLinks";
-<<<<<<< Updated upstream
-=======
-import { useAuth } from "../context/AuthContext";
-import { Link } from "react-router-dom";
+//import { useAuth } from "../context/AuthContext";
+//import { Link } from "react-router-dom";
 import AnalyticsTab from "../components/profile/AnalyticsTab";
->>>>>>> Stashed changes
 
 function Profile() {
   const [activeTab, setActiveTab] = useState("Overview");
