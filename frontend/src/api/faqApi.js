@@ -12,7 +12,12 @@ async function request(path, options = {}) {
   const data = await response.json().catch(() => null);
 
   if (!response.ok) {
-    throw new Error(data?.error || "API request failed");
+    const message =
+      data?.message ||
+      data?.error ||
+      `Request failed with status ${response.status}`;
+
+    throw new Error(message);
   }
 
   return data;

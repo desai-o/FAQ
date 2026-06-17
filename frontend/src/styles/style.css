@@ -4395,3 +4395,55 @@ body.sidebar-collapsed .main-wrapper {
     display: none !important;
   }
 }
+
+/* Custom additions for platform hardening sprint */
+.error-toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: var(--bg-white, #ffffff);
+  border: 1px solid var(--border, #e5e5e5);
+  border-left: 4px solid var(--accent-red, #ef4444);
+  box-shadow: var(--shadow-modal, 0 10px 25px rgba(0,0,0,0.1));
+  border-radius: var(--radius-md, 8px);
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 10000;
+  font-family: var(--font-main, sans-serif);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary, #1a1a1a);
+  animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.error-toast button {
+  background: none;
+  border: none;
+  color: var(--text-secondary, #666666);
+  cursor: pointer;
+  font-size: 18px;
+  padding: 0;
+  line-height: 1;
+}
+
+.danger-button {
+  background: none;
+  border: 1px solid #ef4444;
+  border-radius: var(--radius-sm, 4px);
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  color: #ef4444;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.danger-button:hover {
+  background: #ef4444;
+  color: #ffffff;
+}
