@@ -6,6 +6,8 @@ const { getSQLiteDb } = require("../db/sqlite");
 const Answer = require("../models/Answer");
 const { trackEvent } = require("../services/eventService");
 const { dispatchNotification } = require("../services/notificationService");
+const { requireAuth } = require("../middleware/auth");
+const { canDeleteResource } = require("../middleware/ownership");
 
 router.post("/", async (req, res) => {
   try {
@@ -28,7 +30,9 @@ router.post("/", async (req, res) => {
         questionId: questionId || null,
         queryId: queryId || null,
         content: content.trim(),
-        author: author || "Community Member"
+        author: author || req.user?.name || "Community Member",
+        userId: req.user?.id || "anonymous",
+        authorName: req.user?.name || author || "Community Member"
       });
 
       await trackEvent({
@@ -67,14 +71,18 @@ router.post("/", async (req, res) => {
         query_id,
         content,
         author,
+        user_id,
+        author_name,
         synced_to_mongo
       )
-      VALUES (?, ?, ?, ?, 0)
+      VALUES (?, ?, ?, ?, ?, ?, 0)
       `,
       questionId || null,
       queryId || null,
       content.trim(),
-      author || "Community Member"
+      author || req.user?.name || "Community Member",
+      req.user?.id || "anonymous",
+      req.user?.name || author || "Community Member"
     );
 
     await trackEvent({
@@ -152,6 +160,90 @@ router.get("/:questionId", async (req, res) => {
   } catch (error) {
     res.status(500).json({
       error: "Failed to fetch answers",
+      details: error.message
+    });
+  }
+});
+
+router.delete("/:id", requireAuth, async (req, res) => {
+  try {
+    if (isMongoAvailable()) {
+      const answer = await Answer.findById(req.params.id);
+
+      if (!answer) {
+        return res.status(404).json({
+          status: "error",
+          code: "ANSWER_NOT_FOUND",
+          message: "Answer not found"
+        });
+      }
+
+      if (!canDeleteResource(req.user, answer)) {
+        return res.status(403).json({
+          status: "error",
+          code: "FORBIDDEN",
+          message: "You are not allowed to delete this answer"
+        });
+      }
+
+      await Answer.deleteOne({ _id: answer._id });
+
+      return res.json({
+        status: "success",
+        storage: "mongodb",
+        data: {
+          deleted: true
+        }
+      });
+    }
+
+    const db = getSQLiteDb();
+
+    const answer = await db.get(
+      `
+      SELECT *
+      FROM answers
+      WHERE id = ?
+      `,
+      req.params.id
+    );
+
+    if (!answer) {
+      return res.status(404).json({
+        status: "error",
+        code: "ANSWER_NOT_FOUND",
+        message: "Answer not found"
+      });
+    }
+
+    if (!canDeleteResource(req.user, answer)) {
+      return res.status(403).json({
+        status: "error",
+        code: "FORBIDDEN",
+        message: "You are not allowed to delete this answer"
+      });
+    }
+
+    await db.run(
+      `
+      DELETE FROM answers
+      WHERE id = ?
+      `,
+      req.params.id
+    );
+
+    return res.json({
+      status: "success",
+      storage: "sqlite",
+      data: {
+        deleted: true
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: "error",
+      code: "ANSWER_DELETE_FAILED",
+      message: "Failed to delete answer",
       details: error.message
     });
   }

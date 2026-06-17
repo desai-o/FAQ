@@ -11,6 +11,8 @@ const { trackEvent } = require("../services/eventService");
 const { autoFollow } = require("../services/followService");
 const { dispatchNotification } = require("../services/notificationService");
 const { inferCategory, normalizeTags } = require("../services/categoryService");
+const { requireAuth } = require("../middleware/auth");
+const { canDeleteResource } = require("../middleware/ownership");
 
 const createQuerySchema = z.object({
   body: z.object({
@@ -329,6 +331,90 @@ router.patch("/:id/resolve", validate(resolveQuerySchema), async (req, res) => {
   } catch (error) {
     res.status(500).json({
       error: "Failed to resolve query",
+      details: error.message
+    });
+  }
+});
+
+router.delete("/:id", requireAuth, async (req, res) => {
+  try {
+    if (isMongoAvailable()) {
+      const query = await UserQuery.findById(req.params.id);
+
+      if (!query) {
+        return res.status(404).json({
+          status: "error",
+          code: "QUERY_NOT_FOUND",
+          message: "Query not found"
+        });
+      }
+
+      if (!canDeleteResource(req.user, query)) {
+        return res.status(403).json({
+          status: "error",
+          code: "FORBIDDEN",
+          message: "You are not allowed to delete this query"
+        });
+      }
+
+      await UserQuery.deleteOne({ _id: query._id });
+
+      return res.json({
+        status: "success",
+        storage: "mongodb",
+        data: {
+          deleted: true
+        }
+      });
+    }
+
+    const db = getSQLiteDb();
+
+    const query = await db.get(
+      `
+      SELECT *
+      FROM user_queries
+      WHERE id = ?
+      `,
+      req.params.id
+    );
+
+    if (!query) {
+      return res.status(404).json({
+        status: "error",
+        code: "QUERY_NOT_FOUND",
+        message: "Query not found"
+      });
+    }
+
+    if (!canDeleteResource(req.user, query)) {
+      return res.status(403).json({
+        status: "error",
+        code: "FORBIDDEN",
+        message: "You are not allowed to delete this query"
+      });
+    }
+
+    await db.run(
+      `
+      DELETE FROM user_queries
+      WHERE id = ?
+      `,
+      req.params.id
+    );
+
+    return res.json({
+      status: "success",
+      storage: "sqlite",
+      data: {
+        deleted: true
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: "error",
+      code: "QUERY_DELETE_FAILED",
+      message: "Failed to delete query",
       details: error.message
     });
   }
