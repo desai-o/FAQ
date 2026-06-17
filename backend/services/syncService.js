@@ -3,6 +3,12 @@ const { getSQLiteDb } = require("../db/sqlite");
 const UserQuery = require("../models/UserQuery");
 const FAQ = require("../models/FAQ");
 const User = require("../models/User");
+const Answer = require("../models/Answer");
+const Vote = require("../models/Vote");
+const Bookmark = require("../models/Bookmark");
+const Event = require("../models/Event");
+
+let syncInProgress = false;
 
 function extractKeywords(text) {
   if (!text) return [];
@@ -63,7 +69,11 @@ async function promoteMongoResolvedQueries() {
         question: query.question,
         answer: query.answer,
         keywords: extractKeywords(`${query.question} ${query.answer}`),
-        sourceQueryId: query._id
+        sourceQueryId: query._id,
+        category: query.category || "General",
+        tags: query.tags || [],
+        userId: query.userId || "anonymous",
+        authorName: query.authorName || "Anonymous"
       });
     }
 
@@ -103,14 +113,22 @@ async function promoteSQLiteResolvedQueries() {
           question,
           answer,
           keywords,
+          category,
+          tags,
+          user_id,
+          author_name,
           source_query_id,
           synced_to_mongo
         )
-        VALUES (?, ?, ?, ?, 0)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)
         `,
         row.question,
         row.answer,
         keywords,
+        row.category || "General",
+        row.tags || "",
+        row.user_id || "anonymous",
+        row.author_name || "Anonymous",
         String(row.id)
       );
     }
@@ -124,6 +142,167 @@ async function promoteSQLiteResolvedQueries() {
       `,
       row.id
     );
+  }
+}
+
+async function syncSQLiteAnswersToMongo(db) {
+  const rows = await db.all(`
+    SELECT *
+    FROM answers
+    WHERE synced_to_mongo = 0
+  `);
+
+  for (const row of rows) {
+    try {
+      const answer = await Answer.create({
+        questionId: row.question_id || null,
+        queryId: row.query_id || null,
+        content: row.content,
+        author: row.author || row.author_name || "Community Member",
+        userId: row.user_id || "anonymous",
+        authorName: row.author_name || row.author || "Community Member",
+        votes: row.votes || 0,
+        isBest: Boolean(row.is_best)
+      });
+
+      await db.run(
+        `
+        UPDATE answers
+        SET synced_to_mongo = 1,
+            mongo_id = ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+        `,
+        String(answer._id),
+        row.id
+      );
+    } catch (error) {
+      console.error(`Answer sync failed for SQLite answer ${row.id}:`, error.message);
+    }
+  }
+}
+
+async function syncSQLiteVotesToMongo(db) {
+  const rows = await db.all(`
+    SELECT *
+    FROM votes
+    WHERE synced_to_mongo = 0
+  `);
+
+  for (const row of rows) {
+    try {
+      const existing = await Vote.findOne({
+        userId: row.user_id,
+        targetType: row.target_type,
+        targetId: row.target_id
+      });
+
+      let vote = existing;
+
+      if (!existing) {
+        vote = await Vote.create({
+          userId: row.user_id,
+          targetType: row.target_type,
+          targetId: row.target_id,
+          value: row.value || 1
+        });
+      }
+
+      await db.run(
+        `
+        UPDATE votes
+        SET synced_to_mongo = 1,
+            mongo_id = ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+        `,
+        String(vote._id),
+        row.id
+      );
+    } catch (error) {
+      console.error(`Vote sync failed for SQLite vote ${row.id}:`, error.message);
+    }
+  }
+}
+
+async function syncSQLiteBookmarksToMongo(db) {
+  const rows = await db.all(`
+    SELECT *
+    FROM bookmarks
+    WHERE synced_to_mongo = 0
+  `);
+
+  for (const row of rows) {
+    try {
+      const existing = await Bookmark.findOne({
+        userId: row.user_id,
+        questionId: row.question_id
+      });
+
+      let bookmark = existing;
+
+      if (!existing) {
+        bookmark = await Bookmark.create({
+          userId: row.user_id,
+          questionId: row.question_id
+        });
+      }
+
+      await db.run(
+        `
+        UPDATE bookmarks
+        SET synced_to_mongo = 1,
+            mongo_id = ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+        `,
+        String(bookmark._id),
+        row.id
+      );
+    } catch (error) {
+      console.error(`Bookmark sync failed for SQLite bookmark ${row.id}:`, error.message);
+    }
+  }
+}
+
+async function syncSQLiteEventsToMongo(db) {
+  const rows = await db.all(`
+    SELECT *
+    FROM events
+    WHERE synced_to_mongo = 0
+  `);
+
+  for (const row of rows) {
+    try {
+      let metadata = {};
+
+      try {
+        metadata = row.metadata ? JSON.parse(row.metadata) : {};
+      } catch {
+        metadata = {};
+      }
+
+      const event = await Event.create({
+        type: row.type,
+        userId: row.user_id || "anonymous",
+        targetType: row.target_type || "",
+        targetId: row.target_id || "",
+        metadata
+      });
+
+      await db.run(
+        `
+        UPDATE events
+        SET synced_to_mongo = 1,
+            mongo_id = ?
+        WHERE id = ?
+        `,
+        String(event._id),
+        row.id
+      );
+    } catch (error) {
+      console.error(`Event sync failed for SQLite event ${row.id}:`, error.message);
+    }
   }
 }
 
@@ -148,7 +327,10 @@ async function syncSQLiteToMongo() {
         mongoUser = await User.create({
           name: row.name,
           email: row.email,
-          password: row.password_hash,
+          passwordHash: row.password_hash,
+          role: row.role || "student",
+          badges: row.badges ? row.badges.split(",").filter(Boolean) : [],
+          cohort: row.cohort || "",
           questionsCount: row.questions_count,
           answersCount: row.answers_count,
           reputation: row.reputation
@@ -177,33 +359,42 @@ async function syncSQLiteToMongo() {
   `);
 
   for (const row of unsyncedQueries) {
-    const existingQuery = await UserQuery.findOne({
-      question: new RegExp(`^${escapeRegex(row.question)}$`, "i")
-    });
-
-    let mongoQuery = existingQuery;
-
-    if (!existingQuery) {
-      mongoQuery = await UserQuery.create({
-        question: row.question,
-        answer: row.answer || "",
-        status: row.status,
-        source: row.source || "sqlite-fallback",
-        promoted: Boolean(row.promoted)
+    try {
+      const existingQuery = await UserQuery.findOne({
+        question: new RegExp(`^${escapeRegex(row.question)}$`, "i")
       });
-    }
 
-    await db.run(
-      `
-      UPDATE user_queries
-      SET synced_to_mongo = 1,
-          mongo_id = ?,
-          updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-      `,
-      String(mongoQuery._id),
-      row.id
-    );
+      let mongoQuery = existingQuery;
+
+      if (!existingQuery) {
+        mongoQuery = await UserQuery.create({
+          question: row.question,
+          answer: row.answer || "",
+          status: row.status,
+          source: row.source || "sqlite-fallback",
+          promoted: Boolean(row.promoted),
+          description: row.description || "",
+          category: row.category || "General",
+          tags: row.tags ? row.tags.split(",").filter(Boolean) : [],
+          userId: row.user_id || "anonymous",
+          authorName: row.author_name || "Anonymous"
+        });
+      }
+
+      await db.run(
+        `
+        UPDATE user_queries
+        SET synced_to_mongo = 1,
+            mongo_id = ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+        `,
+        String(mongoQuery._id),
+        row.id
+      );
+    } catch (querySyncErr) {
+      console.error(`Query sync failed for SQLite query ${row.id}:`, querySyncErr.message);
+    }
   }
 
   const unsyncedFaqs = await db.all(`
@@ -213,36 +404,56 @@ async function syncSQLiteToMongo() {
   `);
 
   for (const row of unsyncedFaqs) {
-    const existingFaq = await FAQ.findOne({
-      question: new RegExp(`^${escapeRegex(row.question)}$`, "i")
-    });
-
-    let mongoFaq = existingFaq;
-
-    if (!existingFaq) {
-      mongoFaq = await FAQ.create({
-        question: row.question,
-        answer: row.answer,
-        keywords: row.keywords ? row.keywords.split(",") : [],
-        sourceQueryId: null
+    try {
+      const existingFaq = await FAQ.findOne({
+        question: new RegExp(`^${escapeRegex(row.question)}$`, "i")
       });
-    }
 
-    await db.run(
-      `
-      UPDATE faqs
-      SET synced_to_mongo = 1,
-          mongo_id = ?,
-          updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-      `,
-      String(mongoFaq._id),
-      row.id
-    );
+      let mongoFaq = existingFaq;
+
+      if (!existingFaq) {
+        mongoFaq = await FAQ.create({
+          question: row.question,
+          answer: row.answer,
+          keywords: row.keywords ? row.keywords.split(",") : [],
+          sourceQueryId: null,
+          category: row.category || "General",
+          tags: row.tags ? row.tags.split(",").filter(Boolean) : [],
+          searchBoost: row.search_boost || 1,
+          userId: row.user_id || "anonymous",
+          authorName: row.author_name || "Anonymous"
+        });
+      }
+
+      await db.run(
+        `
+        UPDATE faqs
+        SET synced_to_mongo = 1,
+            mongo_id = ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+        `,
+        String(mongoFaq._id),
+        row.id
+      );
+    } catch (faqSyncErr) {
+      console.error(`FAQ sync failed for SQLite FAQ ${row.id}:`, faqSyncErr.message);
+    }
   }
+
+  await syncSQLiteAnswersToMongo(db);
+  await syncSQLiteVotesToMongo(db);
+  await syncSQLiteBookmarksToMongo(db);
+  await syncSQLiteEventsToMongo(db);
 }
 
 async function runSyncPipeline() {
+  if (syncInProgress) {
+    return;
+  }
+
+  syncInProgress = true;
+
   try {
     await promoteSQLiteResolvedQueries();
 
@@ -253,6 +464,8 @@ async function runSyncPipeline() {
     }
   } catch (error) {
     console.error("Sync pipeline error:", error.message);
+  } finally {
+    syncInProgress = false;
   }
 }
 
