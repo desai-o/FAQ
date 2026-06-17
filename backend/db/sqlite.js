@@ -127,32 +127,6 @@ async function connectSQLite() {
     );
   `);
 
-  await sqliteDb.exec(`
-    CREATE TABLE IF NOT EXISTS follows (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id TEXT NOT NULL,
-      followable_type TEXT NOT NULL,
-      followable_id TEXT NOT NULL,
-      is_muted INTEGER DEFAULT 0,
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE(user_id, followable_type, followable_id)
-    );
-  `);
-
-  await sqliteDb.exec(`
-    CREATE TABLE IF NOT EXISTS notifications (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id TEXT NOT NULL,
-      follow_id INTEGER,
-      message TEXT NOT NULL,
-      is_read INTEGER DEFAULT 0,
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY(follow_id) REFERENCES follows(id) ON DELETE SET NULL
-    );
-  `);
-
-  await runMigrations(sqliteDb);
-
   console.log("SQLite fallback ready");
 }
 

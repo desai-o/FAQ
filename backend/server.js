@@ -100,10 +100,6 @@ app.use("/api/votes", voteRoutes);
 app.use("/api/bookmarks", bookmarkRoutes);
 app.use("/api/stats", statsRoutes);
 app.use("/api/auth", authRoutes);
-app.use("/api/admin", adminRoutes);
-app.use("/api/follows", followRoutes);
-app.use("/api/notifications", notificationRoutes);
-app.use("/api/docs", docsRoutes);
 app.use("/api", aiRoutes);
 
 app.use(notFound);
