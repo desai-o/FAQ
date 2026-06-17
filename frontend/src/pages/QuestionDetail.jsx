@@ -6,7 +6,7 @@ import AskQuestionModal from "../components/AskQuestionModal";
 import Hashtag from "../components/Hashtag";
 import { useFAQ } from "../context/FAQContext";
 import { useAuth } from "../context/AuthContext";
-import { deleteFaq, deleteQuery, deleteAnswer } from "../api/faqApi";
+import { deleteFaq, deleteQuery, deleteAnswer, followResource, unfollowResource, muteFollow } from "../api/faqApi";
 import ErrorToast from "../components/ErrorToast";
 
 const defaultQuestion = {
@@ -73,17 +73,12 @@ function QuestionDetail() {
   const handleFollowClick = async () => {
     if (!followData.isFollowing) {
       try {
-        const res = await fetch("http://localhost:5000/api/follows", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "user-id": "1" },
-          body: JSON.stringify({ followable_type: "question", followable_id: question.id })
-        });
-        const data = await res.json();
-        if (res.ok || res.status === 409) {
-          setFollowData({ isFollowing: true, isMuted: false, followId: data.id || followData.followId });
-        }
+        const res = await followResource("question", question.id);
+        const followId = res.data?._id || res.data?.id || followData.followId;
+        setFollowData({ isFollowing: true, isMuted: false, followId });
       } catch (err) {
         console.error("Failed to follow", err);
+        setError(err.message || "Failed to follow.");
       }
     } else {
       setShowFollowMenu(!showFollowMenu);
@@ -93,31 +88,26 @@ function QuestionDetail() {
   const handleUnfollow = async () => {
     try {
       if (followData.followId) {
-        await fetch(`http://localhost:5000/api/follows/${followData.followId}`, {
-          method: "DELETE",
-          headers: { "user-id": "1" }
-        });
+        await unfollowResource(followData.followId);
       }
       setFollowData({ isFollowing: false, isMuted: false, followId: null });
       setShowFollowMenu(false);
     } catch (err) {
       console.error("Failed to unfollow", err);
+      setError(err.message || "Failed to unfollow.");
     }
   };
 
   const handleMuteToggle = async () => {
     try {
       if (followData.followId) {
-        await fetch(`http://localhost:5000/api/follows/${followData.followId}/mute`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json", "user-id": "1" },
-          body: JSON.stringify({ is_muted: !followData.isMuted })
-        });
+        await muteFollow(followData.followId, !followData.isMuted);
       }
       setFollowData(prev => ({ ...prev, isMuted: !prev.isMuted }));
       setShowFollowMenu(false);
     } catch (err) {
       console.error("Failed to toggle mute", err);
+      setError(err.message || "Failed to toggle mute.");
     }
   };
 
