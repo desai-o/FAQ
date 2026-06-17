@@ -1,5 +1,6 @@
 const sqlite3 = require("sqlite3");
 const { open } = require("sqlite");
+const { runMigrations } = require("./migrations/runMigrations");
 
 let sqliteDb = null;
 
@@ -17,6 +18,11 @@ async function connectSQLite() {
       answer TEXT DEFAULT '',
       status TEXT DEFAULT 'pending',
       source TEXT DEFAULT 'frontend',
+      description TEXT DEFAULT '',
+      category TEXT DEFAULT 'General',
+      tags TEXT DEFAULT '',
+      user_id TEXT DEFAULT 'anonymous',
+      author_name TEXT DEFAULT 'Anonymous',
       promoted INTEGER DEFAULT 0,
       synced_to_mongo INTEGER DEFAULT 0,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
@@ -31,6 +37,11 @@ async function connectSQLite() {
       question TEXT NOT NULL,
       answer TEXT NOT NULL,
       keywords TEXT DEFAULT '',
+      category TEXT DEFAULT 'General',
+      tags TEXT DEFAULT '',
+      search_boost REAL DEFAULT 1,
+      user_id TEXT DEFAULT 'anonymous',
+      author_name TEXT DEFAULT 'Anonymous',
       source_query_id TEXT,
       synced_to_mongo INTEGER DEFAULT 0,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
@@ -38,36 +49,41 @@ async function connectSQLite() {
     );
   `);
 
-await sqliteDb.exec(`
-  CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    mongo_id TEXT,
-    name TEXT NOT NULL,
-    email TEXT UNIQUE NOT NULL,
-    password_hash TEXT NOT NULL,
-    questions_count INTEGER DEFAULT 0,
-    answers_count INTEGER DEFAULT 0,
-    reputation INTEGER DEFAULT 0,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-  );
-`);
+  await sqliteDb.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      mongo_id TEXT,
+      name TEXT NOT NULL,
+      email TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      role TEXT DEFAULT 'student',
+      badges TEXT DEFAULT '',
+      cohort TEXT DEFAULT '',
+      questions_count INTEGER DEFAULT 0,
+      answers_count INTEGER DEFAULT 0,
+      reputation INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
 
-await sqliteDb.exec(`
-  CREATE TABLE IF NOT EXISTS answers (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    mongo_id TEXT,
-    question_id TEXT,
-    query_id TEXT,
-    content TEXT NOT NULL,
-    author TEXT DEFAULT 'Community Member',
-    votes INTEGER DEFAULT 0,
-    is_best INTEGER DEFAULT 0,
-    synced_to_mongo INTEGER DEFAULT 0,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-  );
-`);
+  await sqliteDb.exec(`
+    CREATE TABLE IF NOT EXISTS answers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      mongo_id TEXT,
+      question_id TEXT,
+      query_id TEXT,
+      content TEXT NOT NULL,
+      author TEXT DEFAULT 'Community Member',
+      user_id TEXT DEFAULT 'anonymous',
+      author_name TEXT DEFAULT 'Community Member',
+      votes INTEGER DEFAULT 0,
+      is_best INTEGER DEFAULT 0,
+      synced_to_mongo INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
 
   await sqliteDb.exec(`
     CREATE TABLE IF NOT EXISTS votes (
@@ -135,26 +151,7 @@ await sqliteDb.exec(`
     );
   `);
 
-  // Seed dummy notifications for testing if empty
-  try {
-    const notifCount = await sqliteDb.get("SELECT COUNT(*) as count FROM notifications");
-    if (notifCount && notifCount.count === 0) {
-      const user = await sqliteDb.get("SELECT id, mongo_id FROM users LIMIT 1");
-      if (user) {
-        const targetUserId = user.mongo_id || String(user.id);
-        await sqliteDb.run(`
-          INSERT INTO notifications (user_id, message, is_read) 
-          VALUES 
-            (?, 'Welcome to CrowdFAQ! Start asking and answering questions today.', 0),
-            (?, 'Alex Chen answered your question: "Best roadmap for AI/ML in 2026?"', 0),
-            (?, 'Your answer to "How does virtual memory work at the OS level?" was upvoted.', 1)
-        `, targetUserId, targetUserId, targetUserId);
-        console.log("Seeded initial notifications for user:", targetUserId);
-      }
-    }
-  } catch (seedErr) {
-    console.error("Failed to seed notifications:", seedErr.message);
-  }
+  await runMigrations(sqliteDb);
 
   console.log("SQLite fallback ready");
 }

@@ -5,10 +5,11 @@ const { isMongoAvailable } = require("../db/mongo");
 const { getSQLiteDb } = require("../db/sqlite");
 const Bookmark = require("../models/Bookmark");
 const { trackEvent } = require("../services/eventService");
-
-router.post("/", async (req, res) => {
+const { requireAuth } = require("../middleware/auth");
+router.post("/", requireAuth, async (req, res) => {
   try {
-    const { userId = "anonymous", questionId } = req.body;
+    const { questionId } = req.body;
+    const userId = req.user.id;
 
     if (!questionId) {
       return res.status(400).json({
@@ -141,9 +142,9 @@ router.post("/", async (req, res) => {
   }
 });
 
-router.get("/:userId", async (req, res) => {
+router.get("/", requireAuth, async (req, res) => {
   try {
-    const { userId } = req.params;
+    const userId = req.user.id;
 
     if (isMongoAvailable()) {
       const bookmarks = await Bookmark.find({ userId });

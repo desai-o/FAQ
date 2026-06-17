@@ -7,6 +7,9 @@ const FAQ = require("../models/FAQ");
 const { extractKeywords } = require("../services/syncService");
 const { autoFollow } = require("../services/followService");
 const { dispatchNotification } = require("../services/notificationService");
+const { inferCategory, normalizeTags } = require("../services/categoryService");
+const { requireAuth } = require("../middleware/auth");
+const { canDeleteResource } = require("../middleware/ownership");
 
 router.get("/", async (req, res) => {
   try {
@@ -41,7 +44,10 @@ router.get("/", async (req, res) => {
 
 router.post("/", async (req, res) => {
   try {
-    const { question, answer } = req.body;
+    const { question, answer, category, tags } = req.body;
+
+    const inferredCategory = category || inferCategory(`${question || ""} ${answer || ""}`);
+    const normalizedTags = normalizeTags(tags || []);
 
     if (!question || question.trim() === "" || !answer || answer.trim() === "") {
       return res.status(400).json({
@@ -67,11 +73,15 @@ router.post("/", async (req, res) => {
       const faq = await FAQ.create({
         question: question.trim(),
         answer: answer.trim(),
-        keywords
+        keywords,
+        category: inferredCategory,
+        tags: normalizedTags,
+        userId: req.user?.id || "anonymous",
+        authorName: req.user?.name || "Anonymous"
       });
 
       await autoFollow(
-        req.body.user_id || req.headers['user-id'],
+        req.user?.id,
         'question',
         faq.id || faq._id.toString()
       );
@@ -79,7 +89,7 @@ router.post("/", async (req, res) => {
       for (const tag of keywords) {
         await dispatchNotification({
           eventType: 'new_question',
-          triggeredByUserId: req.body.user_id || req.headers['user-id'] || 1,
+          triggeredByUserId: req.user?.id || "anonymous",
           followableType: 'tag',
           followableId: tag,
           message: `New question under #${tag}: ${question.substring(0, 50)}`
@@ -100,17 +110,25 @@ router.post("/", async (req, res) => {
         question,
         answer,
         keywords,
+        category,
+        tags,
+        user_id,
+        author_name,
         synced_to_mongo
       )
-      VALUES (?, ?, ?, 0)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 0)
       `,
       question.trim(),
       answer.trim(),
-      keywords.join(",")
+      keywords.join(","),
+      inferredCategory,
+      normalizedTags.join(","),
+      req.user?.id || "anonymous",
+      req.user?.name || "Anonymous"
     );
 
     await autoFollow(
-      req.body.user_id || req.headers['user-id'],
+      req.user?.id,
       'question',
       result.lastID
     );
@@ -118,7 +136,7 @@ router.post("/", async (req, res) => {
     for (const tag of keywords) {
       await dispatchNotification({
         eventType: 'new_question',
-        triggeredByUserId: req.body.user_id || req.headers['user-id'] || 1,
+        triggeredByUserId: req.user?.id || "anonymous",
         followableType: 'tag',
         followableId: tag,
         message: `New question under #${tag}: ${question.substring(0, 50)}`
@@ -137,6 +155,90 @@ router.post("/", async (req, res) => {
   } catch (error) {
     res.status(500).json({
       error: "Failed to create FAQ",
+      details: error.message
+    });
+  }
+});
+
+router.delete("/:id", requireAuth, async (req, res) => {
+  try {
+    if (isMongoAvailable()) {
+      const faq = await FAQ.findById(req.params.id);
+
+      if (!faq) {
+        return res.status(404).json({
+          status: "error",
+          code: "FAQ_NOT_FOUND",
+          message: "FAQ not found"
+        });
+      }
+
+      if (!canDeleteResource(req.user, faq)) {
+        return res.status(403).json({
+          status: "error",
+          code: "FORBIDDEN",
+          message: "You are not allowed to delete this FAQ"
+        });
+      }
+
+      await FAQ.deleteOne({ _id: faq._id });
+
+      return res.json({
+        status: "success",
+        storage: "mongodb",
+        data: {
+          deleted: true
+        }
+      });
+    }
+
+    const db = getSQLiteDb();
+
+    const faq = await db.get(
+      `
+      SELECT *
+      FROM faqs
+      WHERE id = ?
+      `,
+      req.params.id
+    );
+
+    if (!faq) {
+      return res.status(404).json({
+        status: "error",
+        code: "FAQ_NOT_FOUND",
+        message: "FAQ not found"
+      });
+    }
+
+    if (!canDeleteResource(req.user, faq)) {
+      return res.status(403).json({
+        status: "error",
+        code: "FORBIDDEN",
+        message: "You are not allowed to delete this FAQ"
+      });
+    }
+
+    await db.run(
+      `
+      DELETE FROM faqs
+      WHERE id = ?
+      `,
+      req.params.id
+    );
+
+    return res.json({
+      status: "success",
+      storage: "sqlite",
+      data: {
+        deleted: true
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: "error",
+      code: "FAQ_DELETE_FAILED",
+      message: "Failed to delete FAQ",
       details: error.message
     });
   }

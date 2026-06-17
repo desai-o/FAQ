@@ -5,6 +5,9 @@ import Topbar from "../components/Topbar";
 import AskQuestionModal from "../components/AskQuestionModal";
 import Hashtag from "../components/Hashtag";
 import { useFAQ } from "../context/FAQContext";
+import { useAuth } from "../context/AuthContext";
+import { deleteFaq, deleteQuery, deleteAnswer, followResource, unfollowResource, muteFollow } from "../api/faqApi";
+import ErrorToast from "../components/ErrorToast";
 
 const defaultQuestion = {
   title: "Question Not Found",
@@ -36,7 +39,26 @@ function QuestionDetail() {
   const [showFollowMenu, setShowFollowMenu] = useState(false);
   const followMenuRef = useRef(null);
 
+  const { user } = useAuth();
+  const [error, setError] = useState("");
+  const [answers, setAnswers] = useState([]);
+
   const question = questions.find((q) => String(q.id) === String(id)) || defaultQuestion;
+
+  useEffect(() => {
+    if (question && question.answers) {
+      setAnswers(question.answers);
+    }
+  }, [question.answers]);
+
+  function canDelete(resource) {
+    if (!user || !resource) return false;
+
+    return (
+      user.role === "admin" ||
+      String(resource.userId || resource.user_id) === String(user.id)
+    );
+  }
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -51,17 +73,12 @@ function QuestionDetail() {
   const handleFollowClick = async () => {
     if (!followData.isFollowing) {
       try {
-        const res = await fetch("http://localhost:5000/api/follows", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "user-id": "1" },
-          body: JSON.stringify({ followable_type: "question", followable_id: question.id })
-        });
-        const data = await res.json();
-        if (res.ok || res.status === 409) {
-          setFollowData({ isFollowing: true, isMuted: false, followId: data.id || followData.followId });
-        }
+        const res = await followResource("question", question.id);
+        const followId = res.data?._id || res.data?.id || followData.followId;
+        setFollowData({ isFollowing: true, isMuted: false, followId });
       } catch (err) {
         console.error("Failed to follow", err);
+        setError(err.message || "Failed to follow.");
       }
     } else {
       setShowFollowMenu(!showFollowMenu);
@@ -71,31 +88,26 @@ function QuestionDetail() {
   const handleUnfollow = async () => {
     try {
       if (followData.followId) {
-        await fetch(`http://localhost:5000/api/follows/${followData.followId}`, {
-          method: "DELETE",
-          headers: { "user-id": "1" }
-        });
+        await unfollowResource(followData.followId);
       }
       setFollowData({ isFollowing: false, isMuted: false, followId: null });
       setShowFollowMenu(false);
     } catch (err) {
       console.error("Failed to unfollow", err);
+      setError(err.message || "Failed to unfollow.");
     }
   };
 
   const handleMuteToggle = async () => {
     try {
       if (followData.followId) {
-        await fetch(`http://localhost:5000/api/follows/${followData.followId}/mute`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json", "user-id": "1" },
-          body: JSON.stringify({ is_muted: !followData.isMuted })
-        });
+        await muteFollow(followData.followId, !followData.isMuted);
       }
       setFollowData(prev => ({ ...prev, isMuted: !prev.isMuted }));
       setShowFollowMenu(false);
     } catch (err) {
       console.error("Failed to toggle mute", err);
+      setError(err.message || "Failed to toggle mute.");
     }
   };
 
@@ -153,6 +165,7 @@ function QuestionDetail() {
       <div className="main-wrapper">
         <Topbar openModal={() => setShowModal(true)} />
         <main className="content">
+          <ErrorToast message={error} onClose={() => setError("")} />
           <Link to="/questions" className="back-link">← Back to Questions</Link>
 
           <div className="detail-card">
@@ -223,6 +236,22 @@ function QuestionDetail() {
                     {question.bookmarked ? "★ Bookmarked" : "☆ Bookmark"}
                   </button>
 
+                  {canDelete(question) && (
+                    <button
+                      className="danger-button"
+                      onClick={async () => {
+                        try {
+                          await deleteFaq(question.id);
+                          window.history.back();
+                        } catch (err) {
+                          setError(err.message || "Failed to delete question.");
+                        }
+                      }}
+                    >
+                      Delete
+                    </button>
+                  )}
+
                   <div style={{ position: "relative" }} ref={followMenuRef}>
                     <button
                       className={`bookmark-btn ${followData.isFollowing ? "bookmarked" : ""}`}
@@ -290,7 +319,7 @@ function QuestionDetail() {
               {question.answers ? question.answers.length : 0} {question.answers && question.answers.length === 1 ? "Answer" : "Answers"}
             </h2>
 
-            {question.answers && question.answers.map((answer) => (
+            {answers && answers.map((answer) => (
               <div key={answer.id} className={`answer-card ${answer.isBest ? "best-answer" : ""}`}>
                 <div className="vote-col">
                   <button
@@ -313,6 +342,24 @@ function QuestionDetail() {
                       <strong>{answer.author}</strong>
                     </div>
                     <span className="answer-time">{answer.time}</span>
+                    {canDelete(answer) && (
+                      <button
+                        className="danger-button"
+                        onClick={async () => {
+                          try {
+                            await deleteAnswer(answer.id);
+                            setAnswers((prev) =>
+                              prev.filter((item) => String(item.id) !== String(answer.id))
+                            );
+                          } catch (err) {
+                            setError(err.message || "Failed to delete answer.");
+                          }
+                        }}
+                        style={{ marginLeft: "auto" }}
+                      >
+                        Delete
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>

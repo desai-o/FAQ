@@ -5,15 +5,16 @@ const { isMongoAvailable } = require("../db/mongo");
 const { getSQLiteDb } = require("../db/sqlite");
 const Vote = require("../models/Vote");
 const { trackEvent } = require("../services/eventService");
-
-router.post("/", async (req, res) => {
+const { requireAuth } = require("../middleware/auth");
+router.post("/", requireAuth, async (req, res) => {
   try {
     const {
-      userId = "anonymous",
       targetType,
       targetId,
       value = 1
     } = req.body;
+
+    const userId = req.user.id;
 
     if (!targetType || !targetId) {
       return res.status(400).json({

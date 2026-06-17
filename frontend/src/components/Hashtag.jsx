@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { followResource, unfollowResource } from "../api/faqApi";
 
 export default function Hashtag({ tag }) {
   const [isHovered, setIsHovered] = useState(false);
@@ -10,25 +11,16 @@ export default function Hashtag({ tag }) {
     
     if (!followData.isFollowing) {
       try {
-        const res = await fetch("http://localhost:5000/api/follows", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "user-id": "1" },
-          body: JSON.stringify({ followable_type: "tag", followable_id: tag })
-        });
-        const data = await res.json();
-        if (res.ok || res.status === 409) {
-          setFollowData({ isFollowing: true, followId: data.id || followData.followId });
-        }
+        const res = await followResource("tag", tag);
+        const followId = res.data?._id || res.data?.id || followData.followId;
+        setFollowData({ isFollowing: true, followId });
       } catch (err) {
         console.error(err);
       }
     } else {
       try {
         if (followData.followId) {
-          await fetch(`http://localhost:5000/api/follows/${followData.followId}`, {
-            method: "DELETE",
-            headers: { "user-id": "1" }
-          });
+          await unfollowResource(followData.followId);
         }
         setFollowData({ isFollowing: false, followId: null });
       } catch (err) {
