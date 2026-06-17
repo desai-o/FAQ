@@ -25,6 +25,7 @@ const adminRoutes = require("./routes/adminRoutes");
 const answerRoutes = require("./routes/answerRoutes");
 const voteRoutes = require("./routes/voteRoutes");
 const bookmarkRoutes = require("./routes/bookmarkRoutes");
+const docsRoutes = require("./routes/docsRoutes");
 const { optionalAuth } = require("./middleware/auth");
 
 const app = express();
@@ -94,6 +95,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/follows", followRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/docs", docsRoutes);
 app.use("/api", aiRoutes);
 
 app.use(notFound);
