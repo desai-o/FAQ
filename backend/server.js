@@ -23,6 +23,8 @@ const authRoutes = require("./routes/authRoutes");
 const answerRoutes = require("./routes/answerRoutes");
 const voteRoutes = require("./routes/voteRoutes");
 const bookmarkRoutes = require("./routes/bookmarkRoutes");
+const adminRoutes = require("./routes/adminRoutes");
+const adminDocRoutes = require("./routes/adminDocRoutes");
 
 const app = express();
 
@@ -65,6 +67,8 @@ app.use("/api/bookmarks", bookmarkRoutes);
 app.use("/api/stats", statsRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/admin/documents", adminDocRoutes);
 app.use("/api", aiRoutes);
 
 async function bootstrap() {

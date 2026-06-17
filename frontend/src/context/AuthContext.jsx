@@ -61,7 +61,7 @@ export function AuthProvider({ children }) {
 
       localStorage.setItem("crowdfaq-token", data.token);
       setUser(data.user);
-      return { success: true };
+      return { success: true, user: data.user };
     } catch (err) {
       setError(err.message);
       return { success: false, error: err.message };
@@ -90,7 +90,36 @@ export function AuthProvider({ children }) {
 
       localStorage.setItem("crowdfaq-token", data.token);
       setUser(data.user);
-      return { success: true };
+      return { success: true, user: data.user };
+    } catch (err) {
+      setError(err.message);
+      return { success: false, error: err.message };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loginWithGoogle = async (credential) => {
+    setError(null);
+    setLoading(true);
+    try {
+      const response = await fetch("http://localhost:5000/api/auth/google", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ credential })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Google sign-in failed");
+      }
+
+      localStorage.setItem("crowdfaq-token", data.token);
+      setUser(data.user);
+      return { success: true, user: data.user };
     } catch (err) {
       setError(err.message);
       return { success: false, error: err.message };
@@ -100,13 +129,27 @@ export function AuthProvider({ children }) {
   };
 
   const logout = () => {
-    localStorage.removeItem("crowdfaq-token");
+    // Destroy JWT/session token and clear storage
+    localStorage.clear();
+    sessionStorage.clear();
+
+    // Clear authentication cookies
+    document.cookie.split(";").forEach((c) => {
+      document.cookie = c
+        .replace(/^ +/, "")
+        .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+    });
+
+    // Remove user state
     setUser(null);
     setError(null);
+
+    // Redirect immediately to Login
+    window.location.replace("/login");
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, error, login, signup, logout }}>
+    <AuthContext.Provider value={{ user, loading, error, login, signup, loginWithGoogle, logout }}>
       {children}
     </AuthContext.Provider>
   );

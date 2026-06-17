@@ -908,68 +908,69 @@ body.sidebar-collapsed .main-wrapper {
 }
 
 .cta-card {
-  background: var(--bg-cta);
-  color: var(--text-white);
-  border-radius: var(--radius-md);
-  padding: 28px 24px;
-  border: 1px solid var(--border);
+  background: #1e293b !important;
+  color: #ffffff !important;
+  border-radius: var(--radius-md) !important;
+  padding: 28px 24px !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05) !important;
 }
 
 .cta-card h3 {
-  font-size: 18px;
-  font-weight: 700;
-  margin-bottom: 8px;
-  color: #000000;
+  font-size: 18px !important;
+  font-weight: 700 !important;
+  margin-bottom: 8px !important;
+  color: #ffffff !important;
 }
 
 .cta-card p {
-  font-size: 14px;
-  color: var(--cta-text);
-  margin-bottom: 20px;
-  line-height: 1.5;
+  font-size: 14px !important;
+  color: #cbd5e1 !important;
+  margin-bottom: 20px !important;
+  line-height: 1.5 !important;
 }
 
 .cta-ask-btn {
   width: 100%;
-  padding: 12px;
-  background: var(--cta-btn-bg);
-  color: #000000;
-  border: 1px solid #d1d5db;
-  border-radius: var(--radius-sm);
-  font-size: 14px;
-  font-weight: 600;
-  transition: background 0.15s;
+  padding: 12px !important;
+  background: #6366f1 !important;
+  color: #ffffff !important;
+  border: none !important;
+  border-radius: var(--radius-sm) !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+  transition: all 0.2s !important;
 }
 
 .cta-ask-btn:hover {
-  background: var(--cta-btn-hover);
+  background: #4f46e5 !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3) !important;
 }
-/* Dark theme CTA card */
+
+/* Dark theme CTA card overrides to blend nicely */
 [data-theme="dark"] .cta-card {
-  background: #000000;
-  border-color: #222222;
+  background: #111827 !important;
+  border-color: rgba(255, 255, 255, 0.05) !important;
 }
 
-/* Heading at the top of the card */
 [data-theme="dark"] .cta-card h3 {
-  color: #ffffff;
+  color: #ffffff !important;
 }
 
-/* Description text */
 [data-theme="dark"] .cta-card p {
-  color: #a1a1aa;
+  color: #9ca3af !important;
 }
 
-/* Button */
 [data-theme="dark"] .cta-ask-btn {
-  background: #e5e7eb;
-  color: #000000;
-  border: 1px solid #374151;
+  background: #6366f1 !important;
+  color: #ffffff !important;
+  border: none !important;
 }
 
-/* Button hover */
 [data-theme="dark"] .cta-ask-btn:hover {
-  background: #ffffff;
+  background: #4f46e5 !important;
 }
 
 .categories-widget {
@@ -4393,5 +4394,66 @@ body.sidebar-collapsed .main-wrapper {
   }
   body.sidebar-collapsed .sidebar {
     display: none !important;
+  }
+}
+
+/* ── 21. LANDING PAGE DARK MODE CONTRAST VISIBILITY FIXES ── */
+[data-theme="dark"] .landing-container .btn-primary {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.08) !important;
+}
+
+[data-theme="dark"] .landing-container .btn-primary:hover {
+  background: #f1f5f9 !important;
+  box-shadow: 0 8px 20px rgba(255, 255, 255, 0.15) !important;
+}
+
+[data-theme="dark"] .landing-container .btn-secondary {
+  border: 1px solid #ffffff !important;
+  color: #ffffff !important;
+}
+
+[data-theme="dark"] .landing-container .btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.05) !important;
+  box-shadow: 0 8px 20px rgba(255, 255, 255, 0.08) !important;
+}
+
+[data-theme="dark"] .landing-container .landing-feature-card {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+[data-theme="dark"] .landing-container .landing-feature-card:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+[data-theme="dark"] .landing-extension-banner {
+  background: #18181b !important;
+  border-color: #2a2d3e !important;
+}
+
+[data-theme="dark"] .landing-extension-banner-title {
+  color: #f1f5f9 !important;
+}
+
+[data-theme="dark"] .landing-trust-badges {
+  opacity: 1.0 !important;
+}
+
+/* Chatbot animation pulse keyframes */
+@keyframes chatbot-pulse {
+  0% {
+    box-shadow: 0 10px 25px rgba(99,102,241,0.5);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 12px 30px rgba(99,102,241,0.7), 0 0 15px rgba(99,102,241,0.4);
+    transform: scale(1.06);
+  }
+  100% {
+    box-shadow: 0 10px 25px rgba(99,102,241,0.5);
+    transform: scale(1);
   }
 }

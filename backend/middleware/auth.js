@@ -18,10 +18,15 @@ const authenticateUser = async (req, res, next) => {
       try {
         const user = await User.findById(decoded.id).select("-password");
         if (user) {
+          if (user.isSuspended) {
+            return res.status(403).json({ error: "Your account is suspended." });
+          }
           req.user = {
             id: user._id.toString(),
             name: user.name,
             email: user.email,
+            role: user.role || "user",
+            isSuspended: user.isSuspended,
             questionsCount: user.questionsCount,
             answersCount: user.answersCount,
             reputation: user.reputation,
@@ -46,11 +51,17 @@ const authenticateUser = async (req, res, next) => {
       return res.status(401).json({ error: "Token is not valid or user not found" });
     }
 
+    if (user.is_suspended) {
+      return res.status(403).json({ error: "Your account is suspended." });
+    }
+
     req.user = {
       id: user.mongo_id || user.id.toString(),
       sqliteId: user.id,
       name: user.name,
       email: user.email,
+      role: user.role || "user",
+      isSuspended: Boolean(user.is_suspended),
       questionsCount: user.questions_count,
       answersCount: user.answers_count,
       reputation: user.reputation,

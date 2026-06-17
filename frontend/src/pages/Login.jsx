@@ -11,7 +11,7 @@ function Login() {
   const [validationError, setValidationError] = useState("");
   const [toast, setToast] = useState({ show: false, message: "", type: "error" });
 
-  const { login, loading, error } = useAuth();
+  const { login, loginWithGoogle, loading, error } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
 
@@ -68,12 +68,55 @@ function Login() {
       } else {
         localStorage.removeItem("crowdfaq-remember-email");
       }
-      setTimeout(() => navigate("/dashboard"), 800);
+      if (result.user && result.user.role === "admin") {
+        setTimeout(() => navigate("/admin/dashboard"), 800);
+      } else {
+        setTimeout(() => navigate("/dashboard"), 800);
+      }
     }
   };
 
-  const handleGoogleSignIn = () => {
-    showToast("Google Authentication is currently unavailable. Operating in local mode.", "error");
+  const handleGoogleSignIn = async () => {
+    if (window.google) {
+      try {
+        window.google.accounts.id.initialize({
+          client_id: "777894564251-fakeclientid.apps.googleusercontent.com",
+          callback: async (response) => {
+            const result = await loginWithGoogle(response.credential);
+            if (result.success) {
+              showToast("Successfully authenticated with Google!", "success");
+              if (result.user && result.user.role === "admin") {
+                navigate("/admin/dashboard");
+              } else {
+                navigate("/dashboard");
+              }
+            } else {
+              showToast(result.error || "Google Sign-In failed.", "error");
+            }
+          }
+        });
+        window.google.accounts.id.prompt();
+      } catch (err) {
+        console.error("Google SSO prompt error:", err);
+      }
+    } else {
+      const emailInput = window.prompt("Enter mock Google Email for local authentication:", "nikhil@gmail.com");
+      if (emailInput) {
+        const username = emailInput.split("@")[0].replace(/[^a-zA-Z0-9-]/g, "-");
+        const mockToken = `mock-google-token-${username}`;
+        const result = await loginWithGoogle(mockToken);
+        if (result.success) {
+          showToast("Mock Google authentication successful!", "success");
+          if (result.user && result.user.role === "admin") {
+            navigate("/admin/dashboard");
+          } else {
+            navigate("/dashboard");
+          }
+        } else {
+          showToast(result.error || "Google Sign-In failed.", "error");
+        }
+      }
+    }
   };
 
   // Restore remembered email on boot
@@ -129,12 +172,12 @@ function Login() {
         <div className="auth-glow-circle auth-glow-2"></div>
 
         {/* Floating back home button */}
-        <Link to="/dashboard" className="auth-back-home" tabIndex={1}>
+        <Link to="/" className="auth-back-home" tabIndex={1}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <line x1="19" y1="12" x2="5" y2="12"></line>
             <polyline points="12 19 5 12 12 5"></polyline>
           </svg>
-          Back to Dashboard
+          Back to Homepage
         </Link>
 
         <div className="auth-theme-float">
@@ -289,6 +332,10 @@ function Login() {
           <div className="auth-switch">
             Don't have an account? 
             <Link to="/signup" className="auth-switch-link" tabIndex={10}>Sign Up</Link>
+          </div>
+          <div className="auth-switch" style={{ marginTop: "12px" }}>
+            Are you an administrator? 
+            <Link to="/admin/login" className="auth-switch-link" style={{ color: "var(--accent-purple)", fontWeight: "600" }} tabIndex={11}>Admin Portal</Link>
           </div>
         </div>
       </div>

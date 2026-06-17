@@ -1,4 +1,5 @@
 import { NavLink } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 const navItems = [
   {
@@ -25,10 +26,15 @@ const navItems = [
     to: "/subscription", label: "Subscription",
     icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16v16H4z"/><path d="M8 8h8"/><path d="M8 12h8"/><path d="M8 16h5"/></svg>,
   },
-  
+  {
+    to: "/help", label: "Help Center",
+    icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>,
+  },
 ];
 
 function Sidebar() {
+  const { user, logout } = useAuth();
+
   return (
     <aside className="sidebar">
       <div className="sidebar-logo">
@@ -48,6 +54,55 @@ function Sidebar() {
             {item.label}
           </NavLink>
         ))}
+
+        {user && user.role === "admin" && (
+          <>
+            <div className="sidebar-divider" style={{ borderTop: "1px solid var(--border)", margin: "12px 16px", opacity: 0.5 }}></div>
+            <NavLink
+              to="/admin/dashboard"
+              className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}
+              style={{ color: "var(--accent-purple)", fontWeight: "700" }}
+            >
+              <span className="nav-icon" style={{ color: "var(--accent-purple)" }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="7" height="9" rx="1"></rect>
+                  <rect x="14" y="3" width="7" height="5" rx="1"></rect>
+                  <rect x="14" y="12" width="7" height="9" rx="1"></rect>
+                  <rect x="3" y="16" width="7" height="5" rx="1"></rect>
+                </svg>
+              </span>
+              Admin Portal
+            </NavLink>
+          </>
+        )}
+
+        <div className="sidebar-divider" style={{ borderTop: "1px solid var(--border)", margin: "12px 16px", opacity: 0.5 }}></div>
+
+        <button
+          onClick={logout}
+          className="nav-item logout-nav-btn"
+          style={{
+            background: "none",
+            border: "none",
+            width: "100%",
+            textAlign: "left",
+            cursor: "pointer",
+            fontFamily: "inherit",
+            fontSize: "inherit",
+            color: "var(--accent-red)",
+            display: "flex",
+            alignItems: "center"
+          }}
+        >
+          <span className="nav-icon" style={{ color: "var(--accent-red)" }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+              <polyline points="16 17 21 12 16 7"></polyline>
+              <line x1="21" y1="12" x2="9" y2="12"></line>
+            </svg>
+          </span>
+          Logout
+        </button>
       </nav>
     </aside>
   );

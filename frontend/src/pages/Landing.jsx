@@ -324,6 +324,7 @@ function Landing() {
             <li><a href="#product">Product</a></li>
             <li><a href="#features">Features</a></li>
             <li><a href="#community">Community</a></li>
+            <li><Link to="/admin/login">Admin Portal</Link></li>
             <li><a href="#privacy">Privacy</a></li>
             <li><a href="#terms">Terms</a></li>
           </ul>
