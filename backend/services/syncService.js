@@ -1,4 +1,5 @@
 const { isMongoAvailable } = require("../db/mongo");
+const { enqueueJob } = require("./queueService");
 const { getSQLiteDb } = require("../db/sqlite");
 const UserQuery = require("../models/UserQuery");
 const FAQ = require("../models/FAQ");
@@ -477,8 +478,16 @@ function startSyncPipeline() {
   console.log(`Sync pipeline started. Interval: ${interval}ms`);
 }
 
+function enqueueSyncPipeline() {
+  enqueueJob({
+    type: "sync",
+    handler: runSyncPipeline
+  });
+}
+
 module.exports = {
   runSyncPipeline,
+  enqueueSyncPipeline,
   startSyncPipeline,
   extractKeywords
 };

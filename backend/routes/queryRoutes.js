@@ -6,7 +6,7 @@ const { validate } = require("../middleware/validate");
 const { isMongoAvailable } = require("../db/mongo");
 const { getSQLiteDb } = require("../db/sqlite");
 const UserQuery = require("../models/UserQuery");
-const { runSyncPipeline, extractKeywords } = require("../services/syncService");
+const { enqueueSyncPipeline, extractKeywords } = require("../services/syncService");
 const { trackEvent } = require("../services/eventService");
 const { autoFollow } = require("../services/followService");
 const { dispatchNotification } = require("../services/notificationService");
@@ -87,7 +87,7 @@ router.post("/", validate(createQuerySchema), async (req, res) => {
         }
       });
 
-      await runSyncPipeline();
+      enqueueSyncPipeline();
 
       await autoFollow(
         req.user?.id,
@@ -152,7 +152,7 @@ router.post("/", validate(createQuerySchema), async (req, res) => {
       }
     });
 
-    await runSyncPipeline();
+    enqueueSyncPipeline();
 
     await autoFollow(
       req.user?.id,
@@ -254,7 +254,7 @@ router.patch("/:id/resolve", validate(resolveQuerySchema), async (req, res) => {
         });
       }
 
-      await runSyncPipeline();
+      enqueueSyncPipeline();
 
       await autoFollow(
         req.user?.id,
@@ -298,7 +298,7 @@ router.patch("/:id/resolve", validate(resolveQuerySchema), async (req, res) => {
       });
     }
 
-    await runSyncPipeline();
+    enqueueSyncPipeline();
 
     const updated = await db.get(
       `

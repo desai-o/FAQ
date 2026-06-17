@@ -10,7 +10,8 @@ const { notFound, errorHandler } = require("./middleware/errorHandler");
 
 const { connectMongo, isMongoAvailable } = require("./db/mongo");
 const { connectSQLite } = require("./db/sqlite");
-const { startSyncPipeline, runSyncPipeline } = require("./services/syncService");
+const { startSyncPipeline, enqueueSyncPipeline } = require("./services/syncService");
+const { getQueueSize } = require("./services/queueService");
 
 const faqRoutes = require("./routes/faqRoutes");
 const queryRoutes = require("./routes/queryRoutes");
@@ -84,6 +85,13 @@ app.get("/health", (req, res) => {
   });
 });
 
+app.get("/health/queue", (req, res) => {
+  res.json({
+    status: "ok",
+    queueSize: getQueueSize()
+  });
+});
+
 app.use("/api/faqs", faqRoutes);
 app.use("/api/queries", queryRoutes);
 app.use("/api/search", searchRoutes);
@@ -105,7 +113,7 @@ async function bootstrap() {
   await connectSQLite();
   await connectMongo();
 
-  await runSyncPipeline();
+  enqueueSyncPipeline();
   startSyncPipeline();
 
   const PORT = process.env.PORT || 5000;
