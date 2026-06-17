@@ -5,7 +5,6 @@ const { isMongoAvailable } = require("../db/mongo");
 const { getSQLiteDb } = require("../db/sqlite");
 const Answer = require("../models/Answer");
 const { trackEvent } = require("../services/eventService");
-const { dispatchNotification } = require("../services/notificationService");
 
 router.post("/", async (req, res) => {
   try {
@@ -42,14 +41,6 @@ router.post("/", async (req, res) => {
           storage: "mongodb"
         }
       });
-
-      await dispatchNotification({
-        eventType: "answer_created",
-        triggeredByUserId: req.headers['user-id'] || req.body.userId || "anonymous",
-        followableType: "question",
-        followableId: String(questionId || queryId),
-        message: `New answer posted: "${content.substring(0, 40)}..."`
-      }).catch(err => console.error("Error dispatching notification:", err));
 
       return res.status(201).json({
         status: "success",
@@ -88,14 +79,6 @@ router.post("/", async (req, res) => {
         storage: "sqlite"
       }
     });
-
-    await dispatchNotification({
-      eventType: "answer_created",
-      triggeredByUserId: req.headers['user-id'] || req.body.userId || "anonymous",
-      followableType: "question",
-      followableId: String(questionId || queryId),
-      message: `New answer posted: "${content.substring(0, 40)}..."`
-    }).catch(err => console.error("Error dispatching notification:", err));
 
     return res.status(201).json({
       status: "success",

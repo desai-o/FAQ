@@ -69,8 +69,7 @@ function ThemeToggle() {
 
 function Topbar({ openModal }) {
   const { searchQuery, setSearchQuery } = useFAQ();
-  const { user, logout } = useAuth();
-  const { sidebarCollapsed, toggleSidebar } = useTheme();
+  const { user } = useAuth();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const navigate = useNavigate();
   
@@ -79,12 +78,8 @@ function Topbar({ openModal }) {
   const dropdownRef = useRef(null);
 
   useEffect(() => {
-    if (!user) {
-      setNotifications([]);
-      return;
-    }
     fetch("http://localhost:5000/api/notifications", {
-      headers: { "user-id": user.id }
+      headers: { "user-id": "1" }
     })
       .then(res => res.json())
       .then(data => {
@@ -93,7 +88,7 @@ function Topbar({ openModal }) {
         }
       })
       .catch(err => console.error("Failed to fetch notifications:", err));
-  }, [user]);
+  }, []);
 
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
@@ -101,10 +96,10 @@ function Topbar({ openModal }) {
     const nextShow = !showDropdown;
     setShowDropdown(nextShow);
 
-    if (nextShow && unreadCount > 0 && user) {
+    if (nextShow && unreadCount > 0) {
       fetch("http://localhost:5000/api/notifications/read", {
         method: "PATCH",
-        headers: { "user-id": user.id, "Content-Type": "application/json" }
+        headers: { "user-id": "1", "Content-Type": "application/json" }
       })
         .then(() => {
           setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
@@ -131,14 +126,6 @@ function Topbar({ openModal }) {
 
   return (
     <header className="topbar">
-      <button className="sidebar-toggle" onClick={toggleSidebar} aria-label="Toggle Sidebar" title="Toggle Sidebar">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <line x1="3" y1="12" x2="21" y2="12"></line>
-          <line x1="3" y1="6" x2="21" y2="6"></line>
-          <line x1="3" y1="18" x2="21" y2="18"></line>
-        </svg>
-      </button>
-
       <div className="search-box">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         <input
@@ -159,21 +146,21 @@ function Topbar({ openModal }) {
           
           {showDropdown && (
             <div style={{
-              position: "absolute", top: "100%", right: 0, marginTop: "8px", background: "var(--bg-white)", 
-              border: "1px solid var(--border)", borderRadius: "var(--radius-md)", width: "320px", 
-              boxShadow: "var(--shadow-modal)", zIndex: 100, display: "flex", flexDirection: "column"
+              position: "absolute", top: "100%", right: 0, marginTop: "8px", background: "#fff", 
+              border: "1px solid #e5e5e5", borderRadius: "8px", width: "320px", 
+              boxShadow: "0 4px 12px rgba(0,0,0,0.1)", zIndex: 100, display: "flex", flexDirection: "column"
             }}>
-              <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--border)" }}>
-                <h4 style={{ margin: 0, fontSize: "14px", fontWeight: 700, color: "var(--text-primary)" }}>Notifications</h4>
+              <div style={{ padding: "12px 16px", borderBottom: "1px solid #e5e5e5" }}>
+                <h4 style={{ margin: 0, fontSize: "14px", fontWeight: 700, color: "#1a1a1a" }}>Notifications</h4>
               </div>
               <div style={{ maxHeight: "300px", overflowY: "auto" }}>
                 {notifications.length === 0 ? (
-                  <p style={{ margin: 0, padding: "20px", textAlign: "center", color: "var(--text-secondary)", fontSize: "13px" }}>No notifications yet.</p>
+                  <p style={{ margin: 0, padding: "20px", textAlign: "center", color: "#999", fontSize: "13px" }}>No notifications yet.</p>
                 ) : (
                   notifications.map(n => (
-                    <div key={n.id} style={{ padding: "12px 16px", borderBottom: "1px solid var(--border)", display: "flex", flexDirection: "column", gap: "4px" }}>
-                      <p style={{ margin: 0, fontSize: "13px", color: "var(--text-primary)", lineHeight: 1.4 }}>{n.message || "Someone interacted with your post."}</p>
-                      <span style={{ fontSize: "11px", color: "var(--text-secondary)" }}>{new Date(n.created_at).toLocaleString()}</span>
+                    <div key={n.id} style={{ padding: "12px 16px", borderBottom: "1px solid #f0f0f0", display: "flex", flexDirection: "column", gap: "4px" }}>
+                      <p style={{ margin: 0, fontSize: "13px", color: "#1a1a1a", lineHeight: 1.4 }}>{n.message || "Someone interacted with your post."}</p>
+                      <span style={{ fontSize: "11px", color: "#999" }}>{new Date(n.created_at).toLocaleString()}</span>
                     </div>
                   ))
                 )}
@@ -184,35 +171,25 @@ function Topbar({ openModal }) {
 
         <ThemeToggle />
 
+        <button className="notif-btn">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          <span className="notif-dot"></span>
+        </button>
+
         <button className="ask-btn" onClick={openModal}>
           + Ask Question
         </button>
 
         {user ? (
-          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            <div style={{ position: "relative" }}>
-              <div 
-                className="avatar" 
-                style={{ cursor: "pointer" }} 
-                onClick={() => setDropdownOpen(!dropdownOpen)}
-              >
-                {getInitials(user.name)}
-              </div>
-              <ProfileDropdown isOpen={dropdownOpen} onClose={() => setDropdownOpen(false)} />
-            </div>
-
-            <button 
-              className="logout-btn-direct" 
-              onClick={logout} 
-              title="Logout"
-              aria-label="Logout"
+          <div style={{ position: "relative" }}>
+            <div 
+              className="avatar" 
+              style={{ cursor: "pointer" }} 
+              onClick={() => setDropdownOpen(!dropdownOpen)}
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                <polyline points="16 17 21 12 16 7"></polyline>
-                <line x1="21" y1="12" x2="9" y2="12"></line>
-              </svg>
-            </button>
+              {getInitials(user.name)}
+            </div>
+            <ProfileDropdown isOpen={dropdownOpen} onClose={() => setDropdownOpen(false)} />
           </div>
         ) : (
           <button className="signin-btn" onClick={() => navigate("/login")}>

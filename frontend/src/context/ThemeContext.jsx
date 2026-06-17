@@ -11,12 +11,6 @@ export function ThemeProvider({ children }) {
   };
 
   const [theme, setTheme] = useState(getInitialTheme);
-  
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
-    const stored = localStorage.getItem("crowdfaq-sidebar-collapsed");
-    if (stored !== null) return stored === "true";
-    return window.innerWidth <= 768;
-  });
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
@@ -34,26 +28,10 @@ export function ThemeProvider({ children }) {
     return () => mq.removeEventListener("change", handler);
   }, []);
 
-  useEffect(() => {
-    if (sidebarCollapsed) {
-      document.body.classList.add("sidebar-collapsed");
-    } else {
-      document.body.classList.remove("sidebar-collapsed");
-    }
-  }, [sidebarCollapsed]);
-
   const toggleTheme = () => setTheme((t) => (t === "dark" ? "light" : "dark"));
 
-  const toggleSidebar = () => {
-    setSidebarCollapsed((prev) => {
-      const next = !prev;
-      localStorage.setItem("crowdfaq-sidebar-collapsed", next);
-      return next;
-    });
-  };
-
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme, sidebarCollapsed, toggleSidebar }}>
+    <ThemeContext.Provider value={{ theme, toggleTheme }}>
       {children}
     </ThemeContext.Provider>
   );
