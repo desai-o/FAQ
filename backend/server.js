@@ -1,9 +1,5 @@
 require("dotenv").config();
 
-const dns = require("dns");
-dns.setServers(["8.8.8.8", "8.8.4.4"]);
-console.log("Custom DNS applied");
-
 const express = require("express");
 const cors = require("cors");
 
@@ -64,6 +60,7 @@ app.use("/api/votes", voteRoutes);
 app.use("/api/bookmarks", bookmarkRoutes);
 app.use("/api/stats", statsRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/follows", followRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api", aiRoutes);
 

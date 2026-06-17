@@ -4,15 +4,14 @@ const router = express.Router();
 const { isMongoAvailable } = require("../db/mongo");
 const { getSQLiteDb } = require("../db/sqlite");
 const UserQuery = require("../models/UserQuery");
-const { runSyncPipeline } = require("../services/syncService");
+const { runSyncPipeline, extractKeywords } = require("../services/syncService");
 const { trackEvent } = require("../services/eventService");
+const { autoFollow } = require("../services/followService");
+const { dispatchNotification } = require("../services/notificationService");
 
 router.post("/", async (req, res) => {
-  console.log("POST /queries HIT");
   try {
     const { question, answer, description } = req.body;
-
-    console.log("BODY:", req.body);
 
     if (!question || question.trim() === "") {
       return res.status(400).json({
@@ -40,7 +39,6 @@ router.post("/", async (req, res) => {
         status: answer ? "resolved" : "pending",
         source: "frontend"
       });
-      console.log("Saved Mongo Query:", query._id);
 
       await trackEvent({
         type: answer ? "faq_created" : "question_created",
