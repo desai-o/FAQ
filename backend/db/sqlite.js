@@ -1,5 +1,6 @@
 const sqlite3 = require("sqlite3");
 const { open } = require("sqlite");
+const { runMigrations } = require("./migrations/runMigrations");
 
 let sqliteDb = null;
 
@@ -146,26 +147,7 @@ async function connectSQLite() {
     );
   `);
 
-  // Seed dummy notifications for testing if empty
-  try {
-    const notifCount = await sqliteDb.get("SELECT COUNT(*) as count FROM notifications");
-    if (notifCount && notifCount.count === 0) {
-      const user = await sqliteDb.get("SELECT id, mongo_id FROM users LIMIT 1");
-      if (user) {
-        const targetUserId = user.mongo_id || String(user.id);
-        await sqliteDb.run(`
-          INSERT INTO notifications (user_id, message, is_read) 
-          VALUES 
-            (?, 'Welcome to CrowdFAQ! Start asking and answering questions today.', 0),
-            (?, 'Alex Chen answered your question: "Best roadmap for AI/ML in 2026?"', 0),
-            (?, 'Your answer to "How does virtual memory work at the OS level?" was upvoted.', 1)
-        `, targetUserId, targetUserId, targetUserId);
-        console.log("Seeded initial notifications for user:", targetUserId);
-      }
-    }
-  } catch (seedErr) {
-    console.error("Failed to seed notifications:", seedErr.message);
-  }
+  await runMigrations(sqliteDb);
 
   console.log("SQLite fallback ready");
 }
