@@ -42,7 +42,7 @@ router.post("/", async (req, res) => {
 
       await trackEvent({
         type: answer ? "faq_created" : "question_created",
-        userId: "anonymous",
+        userId: req.user?.id || "anonymous",
         targetType: "query",
         targetId: String(query._id),
         metadata: {
@@ -54,7 +54,7 @@ router.post("/", async (req, res) => {
       await runSyncPipeline();
 
       await autoFollow(
-        req.body.user_id || req.headers['user-id'],
+        req.user?.id,
         'question',
         query.id || query._id.toString()
       );
@@ -63,7 +63,7 @@ router.post("/", async (req, res) => {
       for (const tag of keywords) {
         await dispatchNotification({
           eventType: 'new_question',
-          triggeredByUserId: req.body.user_id || req.headers['user-id'] || 1,
+          triggeredByUserId: req.user?.id || "anonymous",
           followableType: 'tag',
           followableId: tag,
           message: `New question under #${tag}: ${question.substring(0, 50)}`
@@ -97,7 +97,7 @@ router.post("/", async (req, res) => {
 
     await trackEvent({
       type: answer ? "faq_created" : "question_created",
-      userId: "anonymous",
+      userId: req.user?.id || "anonymous",
       targetType: "query",
       targetId: String(result.lastID),
       metadata: {
@@ -109,7 +109,7 @@ router.post("/", async (req, res) => {
     await runSyncPipeline();
 
     await autoFollow(
-      req.body.user_id || req.headers['user-id'],
+      req.user?.id,
       'question',
       result.lastID
     );
@@ -118,7 +118,7 @@ router.post("/", async (req, res) => {
     for (const tag of keywords) {
       await dispatchNotification({
         eventType: 'new_question',
-        triggeredByUserId: req.body.user_id || req.headers['user-id'] || 1,
+        triggeredByUserId: req.user?.id || "anonymous",
         followableType: 'tag',
         followableId: tag,
         message: `New question under #${tag}: ${question.substring(0, 50)}`
@@ -211,15 +211,15 @@ router.patch("/:id/resolve", async (req, res) => {
       await runSyncPipeline();
 
       await autoFollow(
-        req.body.user_id || req.headers['user-id'],
+        req.user?.id,
         'question',
         query.id || query._id.toString()
       );
 
-      const username = req.headers['username'] || `User ${req.body.user_id || req.headers['user-id'] || 'Someone'}`;
+      const username = req.user?.name || "Someone";
       await dispatchNotification({
         eventType: 'question_answered',
-        triggeredByUserId: req.body.user_id || req.headers['user-id'] || 1,
+        triggeredByUserId: req.user?.id || "anonymous",
         followableType: 'question',
         followableId: req.params.id,
         message: `${username} answered / commented on: ${query.question.substring(0, 50)}`
@@ -264,15 +264,15 @@ router.patch("/:id/resolve", async (req, res) => {
     );
 
     await autoFollow(
-      req.body.user_id || req.headers['user-id'],
+      req.user?.id,
       'question',
       req.params.id
     );
 
-    const username = req.headers['username'] || `User ${req.body.user_id || req.headers['user-id'] || 'Someone'}`;
+    const username = req.user?.name || "Someone";
     await dispatchNotification({
       eventType: 'question_answered',
-      triggeredByUserId: req.body.user_id || req.headers['user-id'] || 1,
+      triggeredByUserId: req.user?.id || "anonymous",
       followableType: 'question',
       followableId: req.params.id,
       message: `${username} answered / commented on: ${updated.question.substring(0, 50)}`

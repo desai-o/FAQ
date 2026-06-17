@@ -1,14 +1,11 @@
 const express = require("express");
 const router = express.Router();
 const { getSQLiteDb } = require("../db/sqlite");
+const { requireAuth } = require("../middleware/auth");
 
-router.get("/", async (req, res) => {
+router.get("/", requireAuth, async (req, res) => {
   try {
-    const user_id = req.query.user_id || req.headers['user-id'];
-
-    if (!user_id) {
-      return res.status(401).json({ error: "User ID is required" });
-    }
+    const user_id = req.user.id;
 
     const db = getSQLiteDb();
     const user = await db.get("SELECT id, mongo_id FROM users WHERE id = ? OR mongo_id = ?", user_id, user_id);
@@ -32,13 +29,9 @@ router.get("/", async (req, res) => {
   }
 });
 
-router.patch("/read", async (req, res) => {
+router.patch("/read", requireAuth, async (req, res) => {
   try {
-    const user_id = req.body.user_id || req.headers['user-id'];
-
-    if (!user_id) {
-      return res.status(401).json({ error: "User ID is required" });
-    }
+    const user_id = req.user.id;
 
     const db = getSQLiteDb();
     const user = await db.get("SELECT id, mongo_id FROM users WHERE id = ? OR mongo_id = ?", user_id, user_id);

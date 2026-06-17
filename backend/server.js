@@ -19,11 +19,13 @@ const authRoutes = require("./routes/authRoutes");
 const answerRoutes = require("./routes/answerRoutes");
 const voteRoutes = require("./routes/voteRoutes");
 const bookmarkRoutes = require("./routes/bookmarkRoutes");
+const { optionalAuth } = require("./middleware/auth");
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+app.use(optionalAuth);
 
 app.get("/", (req, res) => {
   res.json({

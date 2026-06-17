@@ -6,12 +6,16 @@ const jwt = require("jsonwebtoken");
 const { isMongoAvailable } = require("../db/mongo");
 const { getSQLiteDb } = require("../db/sqlite");
 const User = require("../models/User");
-const authenticateUser = require("../middleware/auth");
+const { requireAuth } = require("../middleware/auth");
 
 // JWT signature function
 const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET || "crowdfaq_secret_key_12345", {
-    expiresIn: "7d"
+  if (!process.env.JWT_SECRET) {
+    throw new Error("JWT_SECRET is required");
+  }
+
+  return jwt.sign({ id }, process.env.JWT_SECRET, {
+    expiresIn: process.env.JWT_EXPIRES_IN || "7d"
   });
 };
 
@@ -201,8 +205,11 @@ router.post("/login", async (req, res) => {
 // @route   GET api/auth/me
 // @desc    Get user data
 // @access  Private
-router.get("/me", authenticateUser, async (req, res) => {
-  res.json({ user: req.user });
+router.get("/me", requireAuth, async (req, res) => {
+  res.json({
+    status: "success",
+    data: req.user
+  });
 });
 
 module.exports = router;

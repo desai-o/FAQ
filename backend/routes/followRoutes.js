@@ -1,15 +1,12 @@
 const express = require("express");
 const router = express.Router();
 const { getSQLiteDb } = require("../db/sqlite");
+const { requireAuth } = require("../middleware/auth");
 
-router.post("/", async (req, res) => {
+router.post("/", requireAuth, async (req, res) => {
   try {
     const { followable_type, followable_id } = req.body;
-    const user_id = req.body.user_id || req.headers['user-id'];
-
-    if (!user_id) {
-      return res.status(401).json({ error: "User ID is required" });
-    }
+    const user_id = req.user.id;
 
     if (!followable_type || !followable_id) {
       return res.status(400).json({ error: "followable_type and followable_id are required" });
@@ -48,10 +45,18 @@ router.post("/", async (req, res) => {
   }
 });
 
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", requireAuth, async (req, res) => {
   try {
     const db = getSQLiteDb();
-    const result = await db.run(`DELETE FROM follows WHERE id = ?`, req.params.id);
+    const result = await db.run(
+      `
+      DELETE FROM follows
+      WHERE id = ?
+        AND user_id = ?
+      `,
+      req.params.id,
+      req.user.id
+    );
     
     if (result.changes === 0) {
       return res.status(404).json({ error: "Follow record not found" });
@@ -63,15 +68,21 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
-router.patch("/:id/mute", async (req, res) => {
+router.patch("/:id/mute", requireAuth, async (req, res) => {
   try {
     const { is_muted } = req.body;
     const db = getSQLiteDb();
     
     const result = await db.run(
-      `UPDATE follows SET is_muted = ? WHERE id = ?`, 
-      is_muted ? 1 : 0, 
-      req.params.id
+      `
+      UPDATE follows
+      SET is_muted = ?
+      WHERE id = ?
+        AND user_id = ?
+      `,
+      is_muted ? 1 : 0,
+      req.params.id,
+      req.user.id
     );
 
     if (result.changes === 0) {
