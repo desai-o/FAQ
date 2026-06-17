@@ -4,9 +4,9 @@
   "description": "Crowdsourced FAQ backend with MongoDB primary store and SQLite fallback",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "NODE_ENV=production node server.js",
+    "dev": "NODE_ENV=development node server.js",
+    "test": "jest --runInBand"
   },
   "keywords": [],
   "author": "",
@@ -15,12 +15,17 @@
   "dependencies": {
     "@google/genai": "^2.8.0",
     "bcryptjs": "^3.0.3",
+    "compression": "^1.8.1",
     "cors": "^2.8.6",
     "dotenv": "^16.6.1",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.5.2",
+    "helmet": "^8.2.0",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^8.0.0",
+    "morgan": "^1.11.0",
     "sqlite": "^5.1.1",
-    "sqlite3": "^6.0.1"
+    "sqlite3": "^6.0.1",
+    "zod": "^4.4.3"
   }
 }

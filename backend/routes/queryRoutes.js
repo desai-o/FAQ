@@ -1,5 +1,7 @@
 const express = require("express");
 const router = express.Router();
+const { z } = require("zod");
+const { validate } = require("../middleware/validate");
 
 const { isMongoAvailable } = require("../db/mongo");
 const { getSQLiteDb } = require("../db/sqlite");
@@ -10,7 +12,29 @@ const { autoFollow } = require("../services/followService");
 const { dispatchNotification } = require("../services/notificationService");
 const { inferCategory, normalizeTags } = require("../services/categoryService");
 
-router.post("/", async (req, res) => {
+const createQuerySchema = z.object({
+  body: z.object({
+    question: z.string().min(3).max(500),
+    answer: z.string().max(3000).optional(),
+    description: z.string().max(3000).optional(),
+    category: z.string().max(100).optional(),
+    tags: z.array(z.string().max(40)).optional()
+  }),
+  params: z.object({}).optional(),
+  query: z.object({}).optional()
+});
+
+const resolveQuerySchema = z.object({
+  body: z.object({
+    answer: z.string().min(1).max(3000)
+  }),
+  params: z.object({
+    id: z.string().min(1)
+  }),
+  query: z.object({}).optional()
+});
+
+router.post("/", validate(createQuerySchema), async (req, res) => {
   try {
     const { question, answer, description, category, tags } = req.body;
 
@@ -193,7 +217,7 @@ router.get("/", async (req, res) => {
   }
 });
 
-router.patch("/:id/resolve", async (req, res) => {
+router.patch("/:id/resolve", validate(resolveQuerySchema), async (req, res) => {
   try {
     const { answer } = req.body;
 

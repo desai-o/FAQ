@@ -2,6 +2,11 @@ require("dotenv").config();
 
 const express = require("express");
 const cors = require("cors");
+const helmet = require("helmet");
+const compression = require("compression");
+const rateLimit = require("express-rate-limit");
+const morgan = require("morgan");
+const { notFound, errorHandler } = require("./middleware/errorHandler");
 
 const { connectMongo, isMongoAvailable } = require("./db/mongo");
 const { connectSQLite } = require("./db/sqlite");
@@ -23,8 +28,31 @@ const { optionalAuth } = require("./middleware/auth");
 
 const app = express();
 
-app.use(cors());
-app.use(express.json());
+app.use(helmet());
+app.use(compression());
+app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
+
+app.use(
+  cors({
+    origin: process.env.CORS_ORIGIN || "http://localhost:5173",
+    credentials: true
+  })
+);
+
+app.use(
+  rateLimit({
+    windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS || 900000),
+    max: Number(process.env.RATE_LIMIT_MAX || 300),
+    standardHeaders: true,
+    legacyHeaders: false
+  })
+);
+
+app.use(
+  express.json({
+    limit: "1mb"
+  })
+);
 app.use(optionalAuth);
 
 app.get("/", (req, res) => {
@@ -65,6 +93,9 @@ app.use("/api/auth", authRoutes);
 app.use("/api/follows", followRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api", aiRoutes);
+
+app.use(notFound);
+app.use(errorHandler);
 
 async function bootstrap() {
   await connectSQLite();
