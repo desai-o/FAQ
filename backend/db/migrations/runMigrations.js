@@ -3,7 +3,7 @@ const path = require("path");
 
 async function ensureMigrationsTable(db) {
   await db.exec(`
-    CREATE TABLE IF NOT EXISTS sqlite_migrations (
+    CREATE TABLE IF NOT EXISTS schema_migrations (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       filename TEXT UNIQUE NOT NULL,
       applied_at TEXT DEFAULT CURRENT_TIMESTAMP
@@ -46,7 +46,7 @@ async function runMigrations(db) {
     const existing = await db.get(
       `
       SELECT *
-      FROM sqlite_migrations
+      FROM schema_migrations
       WHERE filename = ?
       `,
       file
@@ -59,7 +59,7 @@ async function runMigrations(db) {
 
     await db.run(
       `
-      INSERT INTO sqlite_migrations (filename)
+      INSERT INTO schema_migrations (filename)
       VALUES (?)
       `,
       file
