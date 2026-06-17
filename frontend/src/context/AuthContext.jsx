@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect } from "react";
+import { apiRequest } from "../api/client";
 
 const AuthContext = createContext();
 
@@ -11,27 +12,18 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const loadUser = async () => {
       const token = localStorage.getItem("crowdfaq-token");
+
       if (!token) {
         setLoading(false);
         return;
       }
 
       try {
-        const response = await fetch("http://localhost:5000/api/auth/me", {
-          headers: {
-            "Authorization": `Bearer ${token}`
-          }
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          setUser(data.user);
-        } else {
-          // Token expired or invalid
-          localStorage.removeItem("crowdfaq-token");
-          setUser(null);
-        }
+        const data = await apiRequest("/auth/me");
+        setUser(data.user);
       } catch (err) {
+        localStorage.removeItem("crowdfaq-token");
+        setUser(null);
         console.error("Failed to load user profile on boot:", err);
       } finally {
         setLoading(false);
@@ -44,27 +36,25 @@ export function AuthProvider({ children }) {
   const login = async (email, password) => {
     setError(null);
     setLoading(true);
+
     try {
-      const response = await fetch("http://localhost:5000/api/auth/login", {
+      const data = await apiRequest("/auth/login", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ email, password }),
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Login failed");
-      }
 
       localStorage.setItem("crowdfaq-token", data.token);
       setUser(data.user);
       return { success: true, user: data.user };
+
+      return { success: true };
     } catch (err) {
       setError(err.message);
-      return { success: false, error: err.message };
+
+      return {
+        success: false,
+        error: err.message,
+      };
     } finally {
       setLoading(false);
     }
@@ -73,20 +63,12 @@ export function AuthProvider({ children }) {
   const signup = async (name, email, password) => {
     setError(null);
     setLoading(true);
+
     try {
-      const response = await fetch("http://localhost:5000/api/auth/signup", {
+      const data = await apiRequest("/auth/signup", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ name, email, password })
+        body: JSON.stringify({ name, email, password }),
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Signup failed");
-      }
 
       localStorage.setItem("crowdfaq-token", data.token);
       setUser(data.user);
@@ -120,9 +102,15 @@ export function AuthProvider({ children }) {
       localStorage.setItem("crowdfaq-token", data.token);
       setUser(data.user);
       return { success: true, user: data.user };
+
+      return { success: true };
     } catch (err) {
       setError(err.message);
-      return { success: false, error: err.message };
+
+      return {
+        success: false,
+        error: err.message,
+      };
     } finally {
       setLoading(false);
     }
@@ -150,6 +138,16 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthContext.Provider value={{ user, loading, error, login, signup, loginWithGoogle, logout }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        error,
+        login,
+        signup,
+        logout,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

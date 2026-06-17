@@ -30,7 +30,7 @@
   --bg-page:        #f5f4f0;
   --bg-sidebar:     #f5f4f0;
   --bg-white:       #ffffff;
-  --bg-cta:         #111827;
+  --bg-cta:         #ffffff;
   --bg-input:       #ffffff;
   --bg-hover:       #ffffff;
   --bg-table-head:  #f9fafb;
@@ -245,7 +245,7 @@ input, select, textarea {
 .sidebar {
   width: var(--sidebar-width);
   background: var(--bg-sidebar);
-  color: var(--text-primary);
+  color: var(--text-white);
   position: fixed;
   top: 0;
   left: 0;
@@ -258,7 +258,6 @@ input, select, textarea {
   overflow-y: auto;
   -ms-overflow-style: none;  /* IE and Edge */
   scrollbar-width: none;  /* Firefox */
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .sidebar::-webkit-scrollbar {
@@ -266,24 +265,13 @@ input, select, textarea {
 }
 
 .main-wrapper {
-  margin-left: var(--sidebar-width);
-  width: calc(100% - var(--sidebar-width));
+  margin-left: 220px;
+  width: calc(100% - 220px);
   min-height: 100vh;
   background: var(--bg-page);
   display: flex;
   flex-direction: column;
   flex: 1;
-  transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* Collapsed state rules */
-body.sidebar-collapsed .sidebar {
-  transform: translateX(-100%);
-}
-
-body.sidebar-collapsed .main-wrapper {
-  margin-left: 0;
-  width: 100%;
 }
 
 /* ── SIDEBAR LOGO ── */
@@ -296,31 +284,23 @@ body.sidebar-collapsed .main-wrapper {
 
 .logo-icon {
   font-size: 20px;
-  color: #3b82f6;
+  color: var(--text-white);
 }
 
 .logo-text {
   font-size: 18px;
   font-weight: 700;
   letter-spacing: -0.3px;
-  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  color: transparent;
+  color: var(--text-white);
 }
 
-/* Dark mode logo overrides */
+/* Dark mode logo */
 [data-theme="dark"] .logo-icon {
-  color: #3b82f6;
+  color: #ffffff;
 }
 
 [data-theme="dark"] .logo-text {
-  background: linear-gradient(135deg, #60a5fa, #a78bfa);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  color: transparent;
+  color: #ffffff;
 }
 
 /* ── SIDEBAR NAV ── */
@@ -338,7 +318,7 @@ body.sidebar-collapsed .main-wrapper {
   border-radius: var(--radius-sm);
   font-size: 15px;
   font-weight: 500;
-  color: #555555; /* Higher contrast in light mode */
+  color: #aaaaaa;
   transition: background 0.15s, color 0.15s;
 }
 
@@ -350,7 +330,6 @@ body.sidebar-collapsed .main-wrapper {
 .nav-item.active {
   background: #ffffff;
   color: #111827;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
 }
 
 .nav-icon {
@@ -360,19 +339,20 @@ body.sidebar-collapsed .main-wrapper {
 }
 
 /* Dark mode sidebar nav */
+
 [data-theme="dark"] .nav-item {
   color: #9ca3af;
 }
 
 [data-theme="dark"] .nav-item:hover {
-  background: #242424;
+  background: #111111;
   color: #ffffff;
 }
 
 [data-theme="dark"] .nav-item.active {
-  background: #242424;
+  background: #000000;
   color: #ffffff;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  border: 1px solid #222222; /* optional */
 }
 
 /* ── 4. TOPBAR ── */
