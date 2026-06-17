@@ -83,3 +83,30 @@ export async function fetchActivityStats(range = "week") {
 export async function fetchHeatmapStats(range = "week") {
   return request(`/stats/heatmap?range=${range}`);
 }
+
+export async function fetchAdminOverview() {
+  return request("/admin/overview");
+}
+
+export async function fetchPendingQueries() {
+  return request("/admin/pending-queries");
+}
+
+export async function deleteFaq(id) {
+  return request(`/faqs/${id}`, {
+    method: "DELETE"
+  });
+}
+
+export async function deleteQuery(id) {
+  return request(`/queries/${id}`, {
+    method: "DELETE"
+  });
+}
+
+export async function deleteAnswer(id) {
+  return request(`/answers/${id}`, {
+    method: "DELETE"
+  });
+}
+
