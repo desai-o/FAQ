@@ -8,10 +8,16 @@ const { runSyncPipeline, extractKeywords } = require("../services/syncService");
 const { trackEvent } = require("../services/eventService");
 const { autoFollow } = require("../services/followService");
 const { dispatchNotification } = require("../services/notificationService");
+const { inferCategory, normalizeTags } = require("../services/categoryService");
 
 router.post("/", async (req, res) => {
   try {
-    const { question, answer, description } = req.body;
+    const { question, answer, description, category, tags } = req.body;
+
+    const inferredCategory =
+      category || inferCategory(`${question || ""} ${description || ""} ${answer || ""}`);
+
+    const normalizedTags = normalizeTags(tags || []);
 
     if (!question || question.trim() === "") {
       return res.status(400).json({
@@ -36,6 +42,10 @@ router.post("/", async (req, res) => {
         question: question.trim(),
         description: description ? description.trim() : "",
         answer: answer ? answer.trim() : "",
+        category: inferredCategory,
+        tags: normalizedTags,
+        userId: req.user?.id || "anonymous",
+        authorName: req.user?.name || "Anonymous",
         status: answer ? "resolved" : "pending",
         source: "frontend"
       });
@@ -83,14 +93,24 @@ router.post("/", async (req, res) => {
       INSERT INTO user_queries (
         question,
         answer,
+        description,
+        category,
+        tags,
+        user_id,
+        author_name,
         status,
         source,
         synced_to_mongo
       )
-      VALUES (?, ?, ?, ?, 0)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
       `,
       question.trim(),
       answer ? answer.trim() : "",
+      description ? description.trim() : "",
+      inferredCategory,
+      normalizedTags.join(","),
+      req.user?.id || "anonymous",
+      req.user?.name || "Anonymous",
       answer ? "resolved" : "pending",
       "frontend"
     );

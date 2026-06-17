@@ -7,6 +7,7 @@ const FAQ = require("../models/FAQ");
 const { extractKeywords } = require("../services/syncService");
 const { autoFollow } = require("../services/followService");
 const { dispatchNotification } = require("../services/notificationService");
+const { inferCategory, normalizeTags } = require("../services/categoryService");
 
 router.get("/", async (req, res) => {
   try {
@@ -41,7 +42,10 @@ router.get("/", async (req, res) => {
 
 router.post("/", async (req, res) => {
   try {
-    const { question, answer } = req.body;
+    const { question, answer, category, tags } = req.body;
+
+    const inferredCategory = category || inferCategory(`${question || ""} ${answer || ""}`);
+    const normalizedTags = normalizeTags(tags || []);
 
     if (!question || question.trim() === "" || !answer || answer.trim() === "") {
       return res.status(400).json({
@@ -67,11 +71,15 @@ router.post("/", async (req, res) => {
       const faq = await FAQ.create({
         question: question.trim(),
         answer: answer.trim(),
-        keywords
+        keywords,
+        category: inferredCategory,
+        tags: normalizedTags,
+        userId: req.user?.id || "anonymous",
+        authorName: req.user?.name || "Anonymous"
       });
 
       await autoFollow(
-        req.body.user_id || req.headers['user-id'],
+        req.user?.id,
         'question',
         faq.id || faq._id.toString()
       );
@@ -79,7 +87,7 @@ router.post("/", async (req, res) => {
       for (const tag of keywords) {
         await dispatchNotification({
           eventType: 'new_question',
-          triggeredByUserId: req.body.user_id || req.headers['user-id'] || 1,
+          triggeredByUserId: req.user?.id || "anonymous",
           followableType: 'tag',
           followableId: tag,
           message: `New question under #${tag}: ${question.substring(0, 50)}`
@@ -100,17 +108,25 @@ router.post("/", async (req, res) => {
         question,
         answer,
         keywords,
+        category,
+        tags,
+        user_id,
+        author_name,
         synced_to_mongo
       )
-      VALUES (?, ?, ?, 0)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 0)
       `,
       question.trim(),
       answer.trim(),
-      keywords.join(",")
+      keywords.join(","),
+      inferredCategory,
+      normalizedTags.join(","),
+      req.user?.id || "anonymous",
+      req.user?.name || "Anonymous"
     );
 
     await autoFollow(
-      req.body.user_id || req.headers['user-id'],
+      req.user?.id,
       'question',
       result.lastID
     );
@@ -118,7 +134,7 @@ router.post("/", async (req, res) => {
     for (const tag of keywords) {
       await dispatchNotification({
         eventType: 'new_question',
-        triggeredByUserId: req.body.user_id || req.headers['user-id'] || 1,
+        triggeredByUserId: req.user?.id || "anonymous",
         followableType: 'tag',
         followableId: tag,
         message: `New question under #${tag}: ${question.substring(0, 50)}`

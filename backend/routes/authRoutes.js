@@ -64,7 +64,8 @@ router.post("/signup", async (req, res) => {
       const newUser = await User.create({
         name: name.trim(),
         email: normalizedEmail,
-        password: passwordHash
+        passwordHash,
+        role: "student"
       });
 
       userId = newUser._id.toString();
@@ -147,7 +148,7 @@ router.post("/login", async (req, res) => {
     if (isMongoAvailable()) {
       user = await User.findOne({ email: normalizedEmail });
       if (user) {
-        isMatch = await bcrypt.compare(password, user.password);
+        isMatch = await bcrypt.compare(password, user.passwordHash);
         if (isMatch) {
           const token = generateToken(user._id.toString());
           return res.json({
