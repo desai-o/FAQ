@@ -11,6 +11,12 @@ async function connectSQLite() {
   });
 
   await sqliteDb.exec(`
+    PRAGMA foreign_keys = ON;
+    PRAGMA journal_mode = WAL;
+    PRAGMA busy_timeout = 5000;
+  `);
+
+  await sqliteDb.exec(`
     CREATE TABLE IF NOT EXISTS user_queries (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       mongo_id TEXT,
@@ -172,7 +178,15 @@ function getSQLiteDb() {
   return sqliteDb;
 }
 
+async function closeSQLite() {
+  if (sqliteDb) {
+    await sqliteDb.close();
+    sqliteDb = null;
+  }
+}
+
 module.exports = {
   connectSQLite,
-  getSQLiteDb
+  getSQLiteDb,
+  closeSQLite
 };

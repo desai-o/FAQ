@@ -43,6 +43,7 @@ describe("answer authorization integration", () => {
     const { isMongoAvailable } = require("../db/mongo");
     const User = require("../models/User");
     const Answer = require("../models/Answer");
+    const FAQ = require("../models/FAQ");
 
     let userAId;
     if (isMongoAvailable()) {
@@ -53,6 +54,13 @@ describe("answer authorization integration", () => {
         password: "hashed_password"
       });
       userAId = userA._id.toString();
+
+      await FAQ.create({
+        _id: "test-question-123",
+        question: "What is this?",
+        answer: "This is a test question.",
+        userId: userAId
+      });
     } else {
       // Create a user in SQLite
       userAId = "42";
@@ -63,6 +71,13 @@ describe("answer authorization integration", () => {
         "user_a@example.com",
         "hashed_password",
         "student"
+      );
+
+      await db.run(
+        `INSERT INTO faqs (mongo_id, question, answer) VALUES (?, ?, ?)`,
+        "test-question-123",
+        "What is this?",
+        "This is a test question."
       );
     }
 
@@ -91,6 +106,7 @@ describe("answer authorization integration", () => {
       expect(storedAnswer.author).toBe("User A");
       // Cleanup
       await User.deleteOne({ _id: userAId });
+      await FAQ.deleteOne({ _id: "test-question-123" });
       await Answer.deleteOne({ _id: storedAnswer._id });
     } else {
       const storedAnswer = await db.get(

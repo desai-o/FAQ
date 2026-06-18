@@ -8,8 +8,9 @@ const rateLimit = require("express-rate-limit");
 const morgan = require("morgan");
 const { notFound, errorHandler } = require("./middleware/errorHandler");
 
+const mongoose = require("mongoose");
 const { connectMongo, isMongoAvailable } = require("./db/mongo");
-const { connectSQLite } = require("./db/sqlite");
+const { connectSQLite, getSQLiteDb, closeSQLite } = require("./db/sqlite");
 const { startSyncPipeline, enqueueSyncPipeline } = require("./services/syncService");
 const { getQueueSize } = require("./services/queueService");
 
@@ -77,11 +78,23 @@ app.get("/", (req, res) => {
   });
 });
 
-app.get("/health", (req, res) => {
+app.get("/health", async (req, res) => {
+  let sqliteAvailable = false;
+
+  try {
+    const db = getSQLiteDb();
+    await db.get("SELECT 1 AS ok");
+    sqliteAvailable = true;
+  } catch (error) {
+    sqliteAvailable = false;
+  }
+
   res.json({
-    status: "ok",
+    status: sqliteAvailable ? "ok" : "degraded",
     mongoAvailable: isMongoAvailable(),
-    fallback: "sqlite"
+    sqliteAvailable,
+    fallback: "sqlite",
+    queueSize: getQueueSize()
   });
 });
 
@@ -118,13 +131,45 @@ async function bootstrap() {
 
   const PORT = process.env.PORT || 5000;
 
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
   });
+
+  async function shutdown(signal) {
+    console.log(`${signal} received. Shutting down gracefully...`);
+
+    server.close(async () => {
+      try {
+        await closeSQLite();
+
+        if (mongoose.connection.readyState !== 0) {
+          await mongoose.connection.close();
+        }
+
+        console.log("Database connections closed");
+        process.exit(0);
+      } catch (error) {
+        console.error("Graceful shutdown failed:", {
+          message: error.message,
+          stack: process.env.NODE_ENV === "production" ? undefined : error.stack
+        });
+        process.exit(1);
+      }
+    });
+  }
+
+  process.once("SIGINT", () => shutdown("SIGINT"));
+  process.once("SIGTERM", () => shutdown("SIGTERM"));
 }
 
 if (process.env.NODE_ENV !== "test") {
-  bootstrap();
+  bootstrap().catch((error) => {
+    console.error("Backend bootstrap failed:", {
+      message: error.message,
+      stack: process.env.NODE_ENV === "production" ? undefined : error.stack
+    });
+    process.exit(1);
+  });
 }
 
 module.exports = app;
