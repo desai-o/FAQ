@@ -169,3 +169,15 @@ export async function markNotificationsAsRead() {
   });
 }
 
+export function markNotificationAsRead(notificationId) {
+  return request(`/notifications/${notificationId}/read`, {
+    method: "PATCH"
+  });
+}
+
+export function deleteNotification(notificationId) {
+  return request(`/notifications/${notificationId}`, {
+    method: "DELETE"
+  });
+}
+

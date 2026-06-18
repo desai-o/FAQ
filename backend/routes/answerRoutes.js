@@ -6,6 +6,8 @@ const { validate } = require("../middleware/validate");
 const { isMongoAvailable } = require("../db/mongo");
 const { getSQLiteDb } = require("../db/sqlite");
 const Answer = require("../models/Answer");
+const FAQ = require("../models/FAQ");
+const UserQuery = require("../models/UserQuery");
 const { trackEvent } = require("../services/eventService");
 const { requireAuth } = require("../middleware/auth");
 const { canDeleteResource } = require("../middleware/ownership");
@@ -25,7 +27,85 @@ const createAnswerSchema = z.object({
   query: z.object({}).optional()
 });
 
-router.post("/", writeLimiter, validate(createAnswerSchema), async (req, res) => {
+async function validateAnswerTarget({ questionId, queryId, storage }) {
+  if (storage === "mongodb") {
+    if (questionId) {
+      const faqExists = await FAQ.exists({ _id: questionId });
+      if (!faqExists) {
+        return {
+          ok: false,
+          statusCode: 404,
+          code: "QUESTION_NOT_FOUND",
+          message: "Referenced question was not found"
+        };
+      }
+    }
+
+    if (queryId) {
+      const queryExists = await UserQuery.exists({ _id: queryId });
+      if (!queryExists) {
+        return {
+          ok: false,
+          statusCode: 404,
+          code: "QUERY_NOT_FOUND",
+          message: "Referenced query was not found"
+        };
+      }
+    }
+
+    return { ok: true };
+  }
+
+  const db = getSQLiteDb();
+
+  if (questionId) {
+    const faq = await db.get(
+      `
+      SELECT id
+      FROM faqs
+      WHERE id = ?
+         OR mongo_id = ?
+      `,
+      questionId,
+      questionId
+    );
+
+    if (!faq) {
+      return {
+        ok: false,
+        statusCode: 404,
+        code: "QUESTION_NOT_FOUND",
+        message: "Referenced question was not found"
+      };
+    }
+  }
+
+  if (queryId) {
+    const query = await db.get(
+      `
+      SELECT id
+      FROM user_queries
+      WHERE id = ?
+         OR mongo_id = ?
+      `,
+      queryId,
+      queryId
+    );
+
+    if (!query) {
+      return {
+        ok: false,
+        statusCode: 404,
+        code: "QUERY_NOT_FOUND",
+        message: "Referenced query was not found"
+      };
+    }
+  }
+
+  return { ok: true };
+}
+
+router.post("/", requireAuth, writeLimiter, validate(createAnswerSchema), async (req, res) => {
   try {
     const { questionId, queryId, content, author } = req.body;
 
@@ -47,6 +127,20 @@ router.post("/", writeLimiter, validate(createAnswerSchema), async (req, res) =>
 
     const actorId = req.user?.id || "anonymous";
     const actorName = req.user?.name || author || "Community Member";
+
+    const targetValidation = await validateAnswerTarget({
+      questionId,
+      queryId,
+      storage: isMongoAvailable() ? "mongodb" : "sqlite"
+    });
+
+    if (!targetValidation.ok) {
+      return fail(res, {
+        statusCode: targetValidation.statusCode,
+        code: targetValidation.code,
+        message: targetValidation.message
+      });
+    }
 
     if (isMongoAvailable()) {
       const answer = await Answer.create({
@@ -78,7 +172,7 @@ router.post("/", writeLimiter, validate(createAnswerSchema), async (req, res) =>
         followableType: "question",
         followableId: String(questionId || queryId),
         message: `New answer posted: "${content.substring(0, 40)}..."`
-      }).catch(err => console.error("Error dispatching notification:", err));
+      }).catch((err) => console.error("Error dispatching notification:", err));
 
       return success(res, {
         statusCode: 201,
@@ -130,7 +224,7 @@ router.post("/", writeLimiter, validate(createAnswerSchema), async (req, res) =>
       followableType: "question",
       followableId: String(questionId || queryId),
       message: `New answer posted: "${content.substring(0, 40)}..."`
-    }).catch(err => console.error("Error dispatching notification:", err));
+    }).catch((err) => console.error("Error dispatching notification:", err));
 
     return success(res, {
       statusCode: 201,
@@ -150,6 +244,58 @@ router.post("/", writeLimiter, validate(createAnswerSchema), async (req, res) =>
       statusCode: 500,
       code: "ANSWER_CREATE_FAILED",
       message: "Failed to submit answer",
+      details: error.message
+    });
+  }
+});
+
+router.get("/query/:queryId", async (req, res) => {
+  try {
+    const { queryId } = req.params;
+    const { limit, offset } = getPagination(req.query);
+
+    if (isMongoAvailable()) {
+      const [answers, total] = await Promise.all([
+        Answer.find({ queryId }).sort({ createdAt: -1 }).skip(offset).limit(limit),
+        Answer.countDocuments({ queryId })
+      ]);
+
+      return success(res, {
+        storage: "mongodb",
+        data: answers,
+        meta: { pagination: { limit, offset, total } }
+      });
+    }
+
+    const db = getSQLiteDb();
+
+    const [answers, totalRow] = await Promise.all([
+      db.all(
+        `
+        SELECT *
+        FROM answers
+        WHERE query_id = ?
+        ORDER BY created_at DESC
+        LIMIT ?
+        OFFSET ?
+        `,
+        queryId,
+        limit,
+        offset
+      ),
+      db.get("SELECT COUNT(*) AS total FROM answers WHERE query_id = ?", queryId)
+    ]);
+
+    return success(res, {
+      storage: "sqlite",
+      data: answers,
+      meta: { pagination: { limit, offset, total: totalRow.total } }
+    });
+  } catch (error) {
+    return fail(res, {
+      statusCode: 500,
+      code: "QUERY_ANSWERS_FETCH_FAILED",
+      message: "Failed to fetch query answers",
       details: error.message
     });
   }
