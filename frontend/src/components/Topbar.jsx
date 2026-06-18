@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 
 import ProfileDropdown from "./ProfileDropdown";
 import { useAuth } from "../context/AuthContext";
+import { fetchNotifications, markNotificationsAsRead } from "../api/faqApi";
 
 const getInitials = (name) => {
   if (!name) return "?";
@@ -82,6 +83,11 @@ function Topbar({ openModal }) {
       headers: { "user-id": "1" }
     })
       .then(res => res.json())
+    if (!user) {
+      setNotifications([]);
+      return;
+    }
+    fetchNotifications()
       .then(data => {
         if (data && data.data) {
           setNotifications(data.data);
@@ -90,7 +96,7 @@ function Topbar({ openModal }) {
       .catch(err => console.error("Failed to fetch notifications:", err));
   }, []);
 
-  const unreadCount = notifications.filter(n => !n.is_read).length;
+  const unreadCount = notifications.filter(n => !n.isRead && !n.is_read).length;
 
   const handleNotifClick = () => {
     const nextShow = !showDropdown;
@@ -101,8 +107,10 @@ function Topbar({ openModal }) {
         method: "PATCH",
         headers: { "user-id": "1", "Content-Type": "application/json" }
       })
+    if (nextShow && unreadCount > 0 && user) {
+      markNotificationsAsRead()
         .then(() => {
-          setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+          setNotifications(prev => prev.map(n => ({ ...n, isRead: true, is_read: true })));
         })
         .catch(err => console.error("Failed to mark notifications as read:", err));
     }
@@ -161,6 +169,9 @@ function Topbar({ openModal }) {
                     <div key={n.id} style={{ padding: "12px 16px", borderBottom: "1px solid #f0f0f0", display: "flex", flexDirection: "column", gap: "4px" }}>
                       <p style={{ margin: 0, fontSize: "13px", color: "#1a1a1a", lineHeight: 1.4 }}>{n.message || "Someone interacted with your post."}</p>
                       <span style={{ fontSize: "11px", color: "#999" }}>{new Date(n.created_at).toLocaleString()}</span>
+                    <div key={n._id || n.id} style={{ padding: "12px 16px", borderBottom: "1px solid var(--border)", display: "flex", flexDirection: "column", gap: "4px" }}>
+                      <p style={{ margin: 0, fontSize: "13px", color: "var(--text-primary)", lineHeight: 1.4 }}>{n.message || "Someone interacted with your post."}</p>
+                      <span style={{ fontSize: "11px", color: "var(--text-secondary)" }}>{new Date(n.created_at || n.createdAt).toLocaleString()}</span>
                     </div>
                   ))
                 )}

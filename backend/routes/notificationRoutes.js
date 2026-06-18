@@ -1,11 +1,48 @@
 const express = require("express");
 const router = express.Router();
-const { getSQLiteDb } = require("../db/sqlite");
-const { requireAuth } = require("../middleware/auth");
+const { z } = require("zod");
+const { validate } = require("../middleware/validate");
 
-router.get("/", requireAuth, async (req, res) => {
+const { isMongoAvailable } = require("../db/mongo");
+const { getSQLiteDb } = require("../db/sqlite");
+const Notification = require("../models/Notification");
+const { requireAuth } = require("../middleware/auth");
+const { getPagination } = require("../utils/pagination");
+const { success, fail } = require("../utils/apiResponse");
+const { writeLimiter } = require("../middleware/rateLimits");
+
+const getNotificationsSchema = z.object({
+  body: z.object({}).optional(),
+  params: z.object({}).optional(),
+  query: z.object({
+    limit: z.string().optional(),
+    offset: z.string().optional()
+  }).optional()
+});
+
+const markReadSchema = z.object({
+  body: z.object({}).optional(),
+  params: z.object({}).optional(),
+  query: z.object({}).optional()
+});
+
+router.get("/", requireAuth, validate(getNotificationsSchema), async (req, res) => {
   try {
-    const user_id = req.user.id;
+    const userId = req.user.id;
+    const { limit, offset } = getPagination(req.query);
+
+    if (isMongoAvailable()) {
+      const [notifications, total] = await Promise.all([
+        Notification.find({ userId }).sort({ createdAt: -1 }).skip(offset).limit(limit),
+        Notification.countDocuments({ userId })
+      ]);
+
+      return success(res, {
+        storage: "mongodb",
+        data: notifications,
+        meta: { pagination: { limit, offset, total } }
+      });
+    }
 
     const db = getSQLiteDb();
     const notifications = await db.all(`
@@ -20,24 +57,141 @@ router.get("/", requireAuth, async (req, res) => {
     }));
 
     res.json({ data: formatted });
+
+    const user = await db.get(
+      `
+      SELECT id, mongo_id
+      FROM users
+      WHERE id = ?
+         OR mongo_id = ?
+      `,
+      userId,
+      userId
+    );
+
+    const userIdMatch = user
+      ? [String(user.id), user.mongo_id].filter(Boolean)
+      : [userId];
+
+    const placeholders = userIdMatch.map(() => "?").join(",");
+
+    const [notifications, totalRow] = await Promise.all([
+      db.all(
+        `
+        SELECT *
+        FROM notifications
+        WHERE user_id IN (${placeholders})
+        ORDER BY created_at DESC
+        LIMIT ?
+        OFFSET ?
+        `,
+        ...userIdMatch,
+        limit,
+        offset
+      ),
+      db.get(
+        `
+        SELECT COUNT(*) AS total
+        FROM notifications
+        WHERE user_id IN (${placeholders})
+        `,
+        ...userIdMatch
+      )
+    ]);
+
+    return success(res, {
+      storage: "sqlite",
+      data: notifications.map((item) => ({
+        id: String(item.id),
+        _id: String(item.id),
+        userId: item.user_id,
+        followId: item.follow_id,
+        message: item.message,
+        eventType: item.event_type || "",
+        followableType: item.followable_type || "",
+        followableId: item.followable_id || "",
+        isRead: Boolean(item.is_read),
+        createdAt: item.created_at,
+        updatedAt: item.updated_at
+      })),
+      meta: { pagination: { limit, offset, total: totalRow.total } }
+    });
   } catch (error) {
-    res.status(500).json({ error: "Failed to fetch notifications", details: error.message });
+    return fail(res, {
+      statusCode: 500,
+      code: "NOTIFICATIONS_FETCH_FAILED",
+      message: "Failed to fetch notifications",
+      details: error.message
+    });
   }
 });
 
-router.patch("/read", requireAuth, async (req, res) => {
+router.patch("/read", requireAuth, writeLimiter, validate(markReadSchema), async (req, res) => {
   try {
-    const user_id = req.user.id;
+    const userId = req.user.id;
+
+    if (isMongoAvailable()) {
+      await Notification.updateMany(
+        {
+          userId
+        },
+        {
+          isRead: true
+        }
+      );
+
+      return success(res, {
+        storage: "mongodb",
+        data: {
+          updated: true
+        }
+      });
+    }
 
     const db = getSQLiteDb();
     await db.run(
       `UPDATE notifications SET is_read = 1 WHERE user_id = ?`, 
       user_id
+
+    const user = await db.get(
+      `
+      SELECT id, mongo_id
+      FROM users
+      WHERE id = ?
+         OR mongo_id = ?
+      `,
+      userId,
+      userId
     );
 
-    res.json({ success: true });
+    const userIdMatch = user
+      ? [String(user.id), user.mongo_id].filter(Boolean)
+      : [userId];
+
+    const placeholders = userIdMatch.map(() => "?").join(",");
+
+    await db.run(
+      `
+      UPDATE notifications
+      SET is_read = 1
+      WHERE user_id IN (${placeholders})
+      `,
+      ...userIdMatch
+    );
+
+    return success(res, {
+      storage: "sqlite",
+      data: {
+        updated: true
+      }
+    });
   } catch (error) {
-    res.status(500).json({ error: "Failed to mark notifications as read", details: error.message });
+    return fail(res, {
+      statusCode: 500,
+      code: "NOTIFICATIONS_MARK_READ_FAILED",
+      message: "Failed to mark notifications as read",
+      details: error.message
+    });
   }
 });
 

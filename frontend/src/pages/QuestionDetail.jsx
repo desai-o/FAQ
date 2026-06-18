@@ -5,6 +5,9 @@ import Topbar from "../components/Topbar";
 import AskQuestionModal from "../components/AskQuestionModal";
 import Hashtag from "../components/Hashtag";
 import { useFAQ } from "../context/FAQContext";
+import { useAuth } from "../context/AuthContext";
+import { deleteFaq, deleteQuery, deleteAnswer, followResource, unfollowResource, muteFollow, fetchAnswers } from "../api/faqApi";
+import ErrorToast from "../components/ErrorToast";
 
 const defaultQuestion = {
   title: "Question Not Found",
@@ -27,6 +30,7 @@ function QuestionDetail() {
   const [replyText, setReplyText] = useState("");
   const [summary, setSummary] = useState("");
   const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryError, setSummaryError] = useState("");
 
   const [followData, setFollowData] = useState({
     isFollowing: false,
@@ -36,7 +40,58 @@ function QuestionDetail() {
   const [showFollowMenu, setShowFollowMenu] = useState(false);
   const followMenuRef = useRef(null);
 
+  const { user } = useAuth();
+  const [error, setError] = useState("");
+  const [answers, setAnswers] = useState([]);
+
   const question = questions.find((q) => String(q.id) === String(id)) || defaultQuestion;
+
+  const [answersPagination, setAnswersPagination] = useState({ limit: 10, offset: 0, total: 0 });
+
+  const loadAnswers = async (page = 0) => {
+    try {
+      const newOffset = page * answersPagination.limit;
+      const res = await fetchAnswers(id, answersPagination.limit, newOffset);
+      if (res.data) {
+        const mapped = res.data.map((ans) => ({
+          id: ans._id || ans.id,
+          author: ans.author || ans.authorName || "Community Member",
+          avatar: (ans.author || "C")[0].toUpperCase(),
+          content: ans.content,
+          votes: ans.votes || 0,
+          time: ans.createdAt || ans.created_at || "Recently",
+          isBest: Boolean(ans.isBest || ans.is_best)
+        }));
+        setAnswers(mapped);
+        if (res.meta?.pagination) {
+          setAnswersPagination(res.meta.pagination);
+        } else if (res.pagination) {
+          setAnswersPagination(res.pagination);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load answers from backend", err);
+    }
+  };
+
+  useEffect(() => {
+    if (id && id !== "test-id" && id !== "undefined") {
+      loadAnswers(0);
+    } else {
+      if (question && question.answers) {
+        setAnswers(question.answers);
+      }
+    }
+  }, [id, question.answers]);
+
+  function canDelete(resource) {
+    if (!user || !resource) return false;
+
+    return (
+      user.role === "admin" ||
+      String(resource.userId || resource.user_id) === String(user.id)
+    );
+  }
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -51,17 +106,12 @@ function QuestionDetail() {
   const handleFollowClick = async () => {
     if (!followData.isFollowing) {
       try {
-        const res = await fetch("http://localhost:5000/api/follows", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "user-id": "1" },
-          body: JSON.stringify({ followable_type: "question", followable_id: question.id })
-        });
-        const data = await res.json();
-        if (res.ok || res.status === 409) {
-          setFollowData({ isFollowing: true, isMuted: false, followId: data.id || followData.followId });
-        }
+        const res = await followResource("question", question.id);
+        const followId = res.data?._id || res.data?.id || followData.followId;
+        setFollowData({ isFollowing: true, isMuted: false, followId });
       } catch (err) {
         console.error("Failed to follow", err);
+        setError(err.message || "Failed to follow.");
       }
     } else {
       setShowFollowMenu(!showFollowMenu);
@@ -71,31 +121,26 @@ function QuestionDetail() {
   const handleUnfollow = async () => {
     try {
       if (followData.followId) {
-        await fetch(`http://localhost:5000/api/follows/${followData.followId}`, {
-          method: "DELETE",
-          headers: { "user-id": "1" }
-        });
+        await unfollowResource(followData.followId);
       }
       setFollowData({ isFollowing: false, isMuted: false, followId: null });
       setShowFollowMenu(false);
     } catch (err) {
       console.error("Failed to unfollow", err);
+      setError(err.message || "Failed to unfollow.");
     }
   };
 
   const handleMuteToggle = async () => {
     try {
       if (followData.followId) {
-        await fetch(`http://localhost:5000/api/follows/${followData.followId}/mute`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json", "user-id": "1" },
-          body: JSON.stringify({ is_muted: !followData.isMuted })
-        });
+        await muteFollow(followData.followId, !followData.isMuted);
       }
       setFollowData(prev => ({ ...prev, isMuted: !prev.isMuted }));
       setShowFollowMenu(false);
     } catch (err) {
       console.error("Failed to toggle mute", err);
+      setError(err.message || "Failed to toggle mute.");
     }
   };
 
@@ -119,32 +164,36 @@ function QuestionDetail() {
   };
 
   const generateSummary = async () => {
-  try {
-    setSummaryLoading(true);
+    try {
+      setSummaryLoading(true);
+      setSummaryError("");
+      setSummary("");
 
-    const response = await fetch(
-      "http://localhost:5000/api/summary",
-      {
+      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
+
+      const response = await fetch(`${apiBaseUrl}/summary`, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
+          "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          question: question.title,
-          answers: question.answers.map((a) => a.content),
-        }),
+          question: question.title || question.question,
+          answers: (answers || []).map((a) => a.content)
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to generate summary: ${response.status}`);
       }
-    );
 
-    const data = await response.json();
-
-    setSummary(data.summary);
-  } catch (err) {
-    console.error(err);
-    setSummary("Failed to generate summary.");
-  } finally {
-    setSummaryLoading(false);
-  }
+      const data = await response.json();
+      setSummary(data.summary);
+    } catch (err) {
+      console.error(err);
+      setSummaryError(err.message || "Failed to generate summary.");
+    } finally {
+      setSummaryLoading(false);
+    }
   };
 
   return (
@@ -153,6 +202,7 @@ function QuestionDetail() {
       <div className="main-wrapper">
         <Topbar openModal={() => setShowModal(true)} />
         <main className="content">
+          <ErrorToast message={error} onClose={() => setError("")} />
           <Link to="/questions" className="back-link">← Back to Questions</Link>
 
           <div className="detail-card">
@@ -181,25 +231,23 @@ function QuestionDetail() {
                   ✨ Generate TL;DR
                 </button>
 
-                {summaryLoading && (
-                <div style={{ marginBottom: "12px" }}>
-                Generating summary...
-                </div>
-                )}
+                {summaryLoading && <p style={{ color: "#aaa", marginBottom: "12px" }}>Generating summary...</p>}
+                {summaryError && <p role="alert" style={{ color: "#f87171", marginBottom: "12px" }}>{summaryError}</p>}
 
                 {summary && (
-                <div
-                style={{
-                marginBottom: "16px",
-                padding: "12px",
-                border: "1px solid #ddd",
-                borderRadius: "8px",
-                background: "#fafafa"
-                }}
-                >
-                <strong>AI Summary</strong>
-                <p>{summary}</p>
-                </div>
+                  <div
+                    style={{
+                      marginBottom: "16px",
+                      padding: "12px",
+                      border: "1px solid #444",
+                      borderRadius: "8px",
+                      background: "#1e1e1e",
+                      color: "#eee"
+                    }}
+                  >
+                    <strong>AI Summary</strong>
+                    <p style={{ marginTop: "6px", fontSize: "14px", lineHeight: "1.5" }}>{summary}</p>
+                  </div>
                 )}
 
 
@@ -222,6 +270,22 @@ function QuestionDetail() {
                   >
                     {question.bookmarked ? "★ Bookmarked" : "☆ Bookmark"}
                   </button>
+
+                  {canDelete(question) && (
+                    <button
+                      className="danger-button"
+                      onClick={async () => {
+                        try {
+                          await deleteFaq(question.id);
+                          window.history.back();
+                        } catch (err) {
+                          setError(err.message || "Failed to delete question.");
+                        }
+                      }}
+                    >
+                      Delete
+                    </button>
+                  )}
 
                   <div style={{ position: "relative" }} ref={followMenuRef}>
                     <button
@@ -290,7 +354,7 @@ function QuestionDetail() {
               {question.answers ? question.answers.length : 0} {question.answers && question.answers.length === 1 ? "Answer" : "Answers"}
             </h2>
 
-            {question.answers && question.answers.map((answer) => (
+            {answers && answers.map((answer) => (
               <div key={answer.id} className={`answer-card ${answer.isBest ? "best-answer" : ""}`}>
                 <div className="vote-col">
                   <button
@@ -313,10 +377,51 @@ function QuestionDetail() {
                       <strong>{answer.author}</strong>
                     </div>
                     <span className="answer-time">{answer.time}</span>
+                    {canDelete(answer) && (
+                      <button
+                        className="danger-button"
+                        onClick={async () => {
+                          try {
+                            await deleteAnswer(answer.id);
+                            setAnswers((prev) =>
+                              prev.filter((item) => String(item.id) !== String(answer.id))
+                            );
+                          } catch (err) {
+                            setError(err.message || "Failed to delete answer.");
+                          }
+                        }}
+                        style={{ marginLeft: "auto" }}
+                      >
+                        Delete
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
             ))}
+            {answersPagination.total > answersPagination.limit && (
+              <div className="pagination-controls" style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "10px", marginTop: "15px", marginBottom: "15px" }}>
+                <button
+                  disabled={answersPagination.offset === 0}
+                  onClick={() => loadAnswers(Math.floor(answersPagination.offset / answersPagination.limit) - 1)}
+                  className="pagination-btn btn-secondary"
+                  style={{ padding: "6px 12px", cursor: answersPagination.offset === 0 ? "not-allowed" : "pointer" }}
+                >
+                  Previous
+                </button>
+                <span className="pagination-info" style={{ color: "#eee" }}>
+                  Page {Math.floor(answersPagination.offset / answersPagination.limit) + 1} of {Math.ceil(answersPagination.total / answersPagination.limit)}
+                </span>
+                <button
+                  disabled={answersPagination.offset + answersPagination.limit >= answersPagination.total}
+                  onClick={() => loadAnswers(Math.floor(answersPagination.offset / answersPagination.limit) + 1)}
+                  className="pagination-btn btn-secondary"
+                  style={{ padding: "6px 12px", cursor: (answersPagination.offset + answersPagination.limit >= answersPagination.total) ? "not-allowed" : "pointer" }}
+                >
+                  Next
+                </button>
+              </div>
+            )}
           </section>
 
           <section className="reply-section">

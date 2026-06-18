@@ -114,6 +114,38 @@ async function connectSQLite() {
   `);
 
   await sqliteDb.exec(`
+    CREATE TABLE IF NOT EXISTS follows (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      mongo_id TEXT,
+      user_id TEXT DEFAULT 'anonymous',
+      followable_type TEXT NOT NULL,
+      followable_id TEXT NOT NULL,
+      is_muted INTEGER DEFAULT 0,
+      synced_to_mongo INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(user_id, followable_type, followable_id)
+    );
+  `);
+
+  await sqliteDb.exec(`
+    CREATE TABLE IF NOT EXISTS notifications (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      mongo_id TEXT,
+      user_id TEXT NOT NULL,
+      follow_id TEXT,
+      message TEXT NOT NULL,
+      is_read INTEGER DEFAULT 0,
+      event_type TEXT DEFAULT '',
+      followable_type TEXT DEFAULT '',
+      followable_id TEXT DEFAULT '',
+      synced_to_mongo INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  await sqliteDb.exec(`
     CREATE TABLE IF NOT EXISTS events (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       mongo_id TEXT,
@@ -126,6 +158,8 @@ async function connectSQLite() {
       created_at TEXT DEFAULT CURRENT_TIMESTAMP
     );
   `);
+
+  await runMigrations(sqliteDb);
 
   console.log("SQLite fallback ready");
 }

@@ -10,7 +10,8 @@ const { notFound, errorHandler } = require("./middleware/errorHandler");
 
 const { connectMongo, isMongoAvailable } = require("./db/mongo");
 const { connectSQLite } = require("./db/sqlite");
-const { startSyncPipeline, runSyncPipeline } = require("./services/syncService");
+const { startSyncPipeline, enqueueSyncPipeline } = require("./services/syncService");
+const { getQueueSize } = require("./services/queueService");
 
 const faqRoutes = require("./routes/faqRoutes");
 const queryRoutes = require("./routes/queryRoutes");
@@ -21,9 +22,11 @@ const notificationRoutes = require("./routes/notificationRoutes");
 const statsRoutes = require("./routes/statsRoutes");
 const aiRoutes = require("./routes/aiRoutes");
 const authRoutes = require("./routes/authRoutes");
+const adminRoutes = require("./routes/adminRoutes");
 const answerRoutes = require("./routes/answerRoutes");
 const voteRoutes = require("./routes/voteRoutes");
 const bookmarkRoutes = require("./routes/bookmarkRoutes");
+const docsRoutes = require("./routes/docsRoutes");
 const { optionalAuth } = require("./middleware/auth");
 
 const app = express();
@@ -82,12 +85,23 @@ app.get("/health", (req, res) => {
   });
 });
 
+app.get("/health/queue", (req, res) => {
+  res.json({
+    status: "ok",
+    queueSize: getQueueSize()
+  });
+});
+
 app.use("/api/faqs", faqRoutes);
 app.use("/api/queries", queryRoutes);
 app.use("/api/search", searchRoutes);
 app.use("/api/answers", answerRoutes);
 app.use("/api/votes", voteRoutes);
 app.use("/api/bookmarks", bookmarkRoutes);
+app.use("/api/follows", followRoutes);
+app.use("/api/notifications", notificationRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/docs", docsRoutes);
 app.use("/api/stats", statsRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api", aiRoutes);
@@ -99,7 +113,7 @@ async function bootstrap() {
   await connectSQLite();
   await connectMongo();
 
-  await runSyncPipeline();
+  enqueueSyncPipeline();
   startSyncPipeline();
 
   const PORT = process.env.PORT || 5000;
@@ -109,4 +123,8 @@ async function bootstrap() {
   });
 }
 
-bootstrap();
+if (process.env.NODE_ENV !== "test") {
+  bootstrap();
+}
+
+module.exports = app;

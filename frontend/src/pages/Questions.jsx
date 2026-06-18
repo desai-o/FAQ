@@ -9,7 +9,7 @@ import { useFAQ } from "../context/FAQContext";
 const filters = ["All", "Unanswered", "Most Voted", "Newest"];
 
 function Questions() {
-  const { questions, upvoteQuestion, searchQuery, setSearchQuery } = useFAQ();
+  const { questions, upvoteQuestion, searchQuery, setSearchQuery, pagination, loadPage, backendOnline } = useFAQ();
   const [showModal, setShowModal] = useState(false);
   const [activeFilter, setActiveFilter] = useState("All");
   const [selectedCategory, setSelectedCategory] = useState("All Categories");
@@ -150,6 +150,31 @@ function Questions() {
               ))
             )}
           </div>
+
+          {/* Pagination Controls */}
+          {backendOnline && pagination && pagination.total > pagination.limit && (
+            <div className="pagination-controls" style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "15px", marginTop: "20px", marginBottom: "20px" }}>
+              <button
+                disabled={pagination.offset === 0}
+                onClick={() => loadPage(Math.floor(pagination.offset / pagination.limit) - 1)}
+                className="pagination-btn btn-secondary"
+                style={{ padding: "8px 16px", cursor: pagination.offset === 0 ? "not-allowed" : "pointer" }}
+              >
+                Previous
+              </button>
+              <span className="pagination-info" style={{ color: "#eee" }}>
+                Page {Math.floor(pagination.offset / pagination.limit) + 1} of {Math.ceil(pagination.total / pagination.limit)}
+              </span>
+              <button
+                disabled={pagination.offset + pagination.limit >= pagination.total}
+                onClick={() => loadPage(Math.floor(pagination.offset / pagination.limit) + 1)}
+                className="pagination-btn btn-secondary"
+                style={{ padding: "8px 16px", cursor: (pagination.offset + pagination.limit >= pagination.total) ? "not-allowed" : "pointer" }}
+              >
+                Next
+              </button>
+            </div>
+          )}
         </main>
       </div>
       <AskQuestionModal open={showModal} onClose={() => setShowModal(false)} />

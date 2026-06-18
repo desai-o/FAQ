@@ -2,8 +2,9 @@ const express = require("express");
 const router = express.Router();
 
 const { generateSummary } = require("../services/aiService");
+const { aiLimiter } = require("../middleware/rateLimits");
 
-router.post("/summary", async (req, res) => {
+router.post("/summary", aiLimiter, async (req, res) => {
   try {
     const { question, answers } = req.body;
 
