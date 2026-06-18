@@ -11,15 +11,11 @@ router.get("/", async (req, res) => {
     }
 
     const db = getSQLiteDb();
-    const user = await db.get("SELECT id, mongo_id FROM users WHERE id = ? OR mongo_id = ?", user_id, user_id);
-    const userIdMatch = user ? [String(user.id), user.mongo_id].filter(Boolean) : [user_id];
-
-    const placeholders = userIdMatch.map(() => "?").join(",");
     const notifications = await db.all(`
       SELECT * FROM notifications 
-      WHERE user_id IN (${placeholders}) 
+      WHERE user_id = ? 
       ORDER BY created_at DESC
-    `, ...userIdMatch);
+    `, user_id);
     
     const formatted = notifications.map(n => ({
       ...n,
@@ -41,13 +37,9 @@ router.patch("/read", async (req, res) => {
     }
 
     const db = getSQLiteDb();
-    const user = await db.get("SELECT id, mongo_id FROM users WHERE id = ? OR mongo_id = ?", user_id, user_id);
-    const userIdMatch = user ? [String(user.id), user.mongo_id].filter(Boolean) : [user_id];
-
-    const placeholders = userIdMatch.map(() => "?").join(",");
     await db.run(
-      `UPDATE notifications SET is_read = 1 WHERE user_id IN (${placeholders})`, 
-      ...userIdMatch
+      `UPDATE notifications SET is_read = 1 WHERE user_id = ?`, 
+      user_id
     );
 
     res.json({ success: true });

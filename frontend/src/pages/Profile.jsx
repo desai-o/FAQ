@@ -91,12 +91,14 @@ function Profile() {
             </div>
           )}
 
-          {activeTab !== "Overview" && (
+          {activeTab === "Analytics" && <AnalyticsTab />}
+
+          {activeTab !== "Overview" && activeTab !== "Analytics" && (
             <div className="profile-card">
               <h2>{activeTab}</h2>
               <p>Content for {activeTab} will be implemented here.</p>
             </div>
-          )}
+          )}  
 
         </main>
       </div>

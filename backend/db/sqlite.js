@@ -174,51 +174,6 @@ await sqliteDb.exec(`
     );
   `);
 
-  await sqliteDb.exec(`
-    CREATE TABLE IF NOT EXISTS follows (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id TEXT NOT NULL,
-      followable_type TEXT NOT NULL,
-      followable_id TEXT NOT NULL,
-      is_muted INTEGER DEFAULT 0,
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE(user_id, followable_type, followable_id)
-    );
-  `);
-
-  await sqliteDb.exec(`
-    CREATE TABLE IF NOT EXISTS notifications (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id TEXT NOT NULL,
-      follow_id INTEGER,
-      message TEXT NOT NULL,
-      is_read INTEGER DEFAULT 0,
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY(follow_id) REFERENCES follows(id) ON DELETE SET NULL
-    );
-  `);
-
-  // Seed dummy notifications for testing if empty
-  try {
-    const notifCount = await sqliteDb.get("SELECT COUNT(*) as count FROM notifications");
-    if (notifCount && notifCount.count === 0) {
-      const user = await sqliteDb.get("SELECT id, mongo_id FROM users LIMIT 1");
-      if (user) {
-        const targetUserId = user.mongo_id || String(user.id);
-        await sqliteDb.run(`
-          INSERT INTO notifications (user_id, message, is_read) 
-          VALUES 
-            (?, 'Welcome to CrowdFAQ! Start asking and answering questions today.', 0),
-            (?, 'Alex Chen answered your question: "Best roadmap for AI/ML in 2026?"', 0),
-            (?, 'Your answer to "How does virtual memory work at the OS level?" was upvoted.', 1)
-        `, targetUserId, targetUserId, targetUserId);
-        console.log("Seeded initial notifications for user:", targetUserId);
-      }
-    }
-  } catch (seedErr) {
-    console.error("Failed to seed notifications:", seedErr.message);
-  }
-
   console.log("SQLite fallback ready");
 }
 
