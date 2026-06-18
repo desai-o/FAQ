@@ -1,27 +1,40 @@
 const express = require("express");
 const router = express.Router();
+const { z } = require("zod");
+const { validate } = require("../middleware/validate");
 
 const { isMongoAvailable } = require("../db/mongo");
 const { getSQLiteDb } = require("../db/sqlite");
 const Follow = require("../models/Follow");
 const { requireAuth } = require("../middleware/auth");
+const { success, fail } = require("../utils/apiResponse");
+const { writeLimiter } = require("../middleware/rateLimits");
 
-router.post("/", requireAuth, async (req, res) => {
+const followSchema = z.object({
+  body: z.object({
+    followableType: z.enum(["question", "tag"]),
+    followableId: z.string().trim().min(1).max(100)
+  }),
+  params: z.object({}).optional(),
+  query: z.object({}).optional()
+});
+
+router.post("/", requireAuth, writeLimiter, validate(followSchema), async (req, res) => {
   try {
     const { followableType, followableId } = req.body;
     const userId = req.user.id;
 
     if (!followableType || !followableId) {
-      return res.status(400).json({
-        status: "error",
+      return fail(res, {
+        statusCode: 400,
         code: "VALIDATION_ERROR",
         message: "followableType and followableId are required"
       });
     }
 
     if (!["question", "tag"].includes(followableType)) {
-      return res.status(400).json({
-        status: "error",
+      return fail(res, {
+        statusCode: 400,
         code: "VALIDATION_ERROR",
         message: "followableType must be question or tag"
       });
@@ -35,8 +48,8 @@ router.post("/", requireAuth, async (req, res) => {
       });
 
       if (existing) {
-        return res.status(409).json({
-          status: "error",
+        return fail(res, {
+          statusCode: 409,
           code: "ALREADY_FOLLOWING",
           message: "Already following"
         });
@@ -48,8 +61,8 @@ router.post("/", requireAuth, async (req, res) => {
         followableId: String(followableId)
       });
 
-      return res.status(201).json({
-        status: "success",
+      return success(res, {
+        statusCode: 201,
         storage: "mongodb",
         data: follow
       });
@@ -71,8 +84,8 @@ router.post("/", requireAuth, async (req, res) => {
     );
 
     if (existing) {
-      return res.status(409).json({
-        status: "error",
+      return fail(res, {
+        statusCode: 409,
         code: "ALREADY_FOLLOWING",
         message: "Already following"
       });
@@ -92,8 +105,8 @@ router.post("/", requireAuth, async (req, res) => {
       String(followableId)
     );
 
-    return res.status(201).json({
-      status: "success",
+    return success(res, {
+      statusCode: 201,
       storage: "sqlite",
       data: {
         id: result.lastID,
@@ -104,8 +117,8 @@ router.post("/", requireAuth, async (req, res) => {
       }
     });
   } catch (error) {
-    res.status(500).json({
-      status: "error",
+    return fail(res, {
+      statusCode: 500,
       code: "FOLLOW_CREATE_FAILED",
       message: "Failed to create follow",
       details: error.message
@@ -113,7 +126,7 @@ router.post("/", requireAuth, async (req, res) => {
   }
 });
 
-router.delete("/:id", requireAuth, async (req, res) => {
+router.delete("/:id", requireAuth, writeLimiter, async (req, res) => {
   try {
     if (isMongoAvailable()) {
       const result = await Follow.deleteOne({
@@ -122,15 +135,14 @@ router.delete("/:id", requireAuth, async (req, res) => {
       });
 
       if (result.deletedCount === 0) {
-        return res.status(404).json({
-          status: "error",
+        return fail(res, {
+          statusCode: 404,
           code: "FOLLOW_NOT_FOUND",
           message: "Follow record not found"
         });
       }
 
-      return res.json({
-        status: "success",
+      return success(res, {
         storage: "mongodb",
         data: {
           deleted: true
@@ -151,23 +163,22 @@ router.delete("/:id", requireAuth, async (req, res) => {
     );
 
     if (result.changes === 0) {
-      return res.status(404).json({
-        status: "error",
+      return fail(res, {
+        statusCode: 404,
         code: "FOLLOW_NOT_FOUND",
         message: "Follow record not found"
       });
     }
 
-    return res.json({
-      status: "success",
+    return success(res, {
       storage: "sqlite",
       data: {
         deleted: true
       }
     });
   } catch (error) {
-    res.status(500).json({
-      status: "error",
+    return fail(res, {
+      statusCode: 500,
       code: "FOLLOW_DELETE_FAILED",
       message: "Failed to unfollow",
       details: error.message
@@ -175,7 +186,7 @@ router.delete("/:id", requireAuth, async (req, res) => {
   }
 });
 
-router.patch("/:id/mute", requireAuth, async (req, res) => {
+router.patch("/:id/mute", requireAuth, writeLimiter, async (req, res) => {
   try {
     const { isMuted } = req.body;
 
@@ -194,15 +205,14 @@ router.patch("/:id/mute", requireAuth, async (req, res) => {
       );
 
       if (!follow) {
-        return res.status(404).json({
-          status: "error",
+        return fail(res, {
+          statusCode: 404,
           code: "FOLLOW_NOT_FOUND",
           message: "Follow record not found"
         });
       }
 
-      return res.json({
-        status: "success",
+      return success(res, {
         storage: "mongodb",
         data: follow
       });
@@ -223,15 +233,14 @@ router.patch("/:id/mute", requireAuth, async (req, res) => {
     );
 
     if (result.changes === 0) {
-      return res.status(404).json({
-        status: "error",
+      return fail(res, {
+        statusCode: 404,
         code: "FOLLOW_NOT_FOUND",
         message: "Follow record not found"
       });
     }
 
-    return res.json({
-      status: "success",
+    return success(res, {
       storage: "sqlite",
       data: {
         id: req.params.id,
@@ -239,8 +248,8 @@ router.patch("/:id/mute", requireAuth, async (req, res) => {
       }
     });
   } catch (error) {
-    res.status(500).json({
-      status: "error",
+    return fail(res, {
+      statusCode: 500,
       code: "FOLLOW_MUTE_FAILED",
       message: "Failed to mute follow",
       details: error.message

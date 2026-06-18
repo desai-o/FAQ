@@ -13,6 +13,9 @@ const { dispatchNotification } = require("../services/notificationService");
 const { inferCategory, normalizeTags } = require("../services/categoryService");
 const { requireAuth } = require("../middleware/auth");
 const { canDeleteResource } = require("../middleware/ownership");
+const { getPagination } = require("../utils/pagination");
+const { success, fail } = require("../utils/apiResponse");
+const { writeLimiter } = require("../middleware/rateLimits");
 
 const createQuerySchema = z.object({
   body: z.object({
@@ -36,7 +39,7 @@ const resolveQuerySchema = z.object({
   query: z.object({}).optional()
 });
 
-router.post("/", validate(createQuerySchema), async (req, res) => {
+router.post("/", writeLimiter, validate(createQuerySchema), async (req, res) => {
   try {
     const { question, answer, description, category, tags } = req.body;
 
@@ -46,20 +49,26 @@ router.post("/", validate(createQuerySchema), async (req, res) => {
     const normalizedTags = normalizeTags(tags || []);
 
     if (!question || question.trim() === "") {
-      return res.status(400).json({
-        error: "Question is required"
+      return fail(res, {
+        statusCode: 400,
+        code: "VALIDATION_ERROR",
+        message: "Question is required"
       });
     }
 
     if (question.length > 500) {
-      return res.status(400).json({
-        error: "Question must be 500 characters or less"
+      return fail(res, {
+        statusCode: 400,
+        code: "VALIDATION_ERROR",
+        message: "Question must be 500 characters or less"
       });
     }
 
     if (answer && answer.length > 3000) {
-      return res.status(400).json({
-        error: "Answer must be 3000 characters or less"
+      return fail(res, {
+        statusCode: 400,
+        code: "VALIDATION_ERROR",
+        message: "Answer must be 3000 characters or less"
       });
     }
 
@@ -106,7 +115,8 @@ router.post("/", validate(createQuerySchema), async (req, res) => {
         });
       }
 
-      return res.status(201).json({
+      return success(res, {
+        statusCode: 201,
         storage: "mongodb",
         data: query
       });
@@ -171,7 +181,8 @@ router.post("/", validate(createQuerySchema), async (req, res) => {
       });
     }
 
-    return res.status(201).json({
+    return success(res, {
+      statusCode: 201,
       storage: "sqlite",
       data: {
         id: result.lastID,
@@ -181,8 +192,10 @@ router.post("/", validate(createQuerySchema), async (req, res) => {
       }
     });
   } catch (error) {
-    res.status(500).json({
-      error: "Failed to save query",
+    return fail(res, {
+      statusCode: 500,
+      code: "QUERY_CREATE_FAILED",
+      message: "Failed to save query",
       details: error.message
     });
   }
@@ -190,48 +203,70 @@ router.post("/", validate(createQuerySchema), async (req, res) => {
 
 router.get("/", async (req, res) => {
   try {
-    if (isMongoAvailable()) {
-      const queries = await UserQuery.find().sort({ createdAt: -1 });
+    const { limit, offset } = getPagination(req.query);
 
-      return res.json({
+    if (isMongoAvailable()) {
+      const [queries, total] = await Promise.all([
+        UserQuery.find().sort({ createdAt: -1 }).skip(offset).limit(limit),
+        UserQuery.countDocuments()
+      ]);
+
+      return success(res, {
         storage: "mongodb",
-        data: queries
+        data: queries,
+        meta: { pagination: { limit, offset, total } }
       });
     }
 
     const db = getSQLiteDb();
 
-    const queries = await db.all(`
-      SELECT *
-      FROM user_queries
-      ORDER BY created_at DESC
-    `);
+    const [queries, totalRow] = await Promise.all([
+      db.all(
+        `
+        SELECT *
+        FROM user_queries
+        ORDER BY created_at DESC
+        LIMIT ?
+        OFFSET ?
+        `,
+        limit,
+        offset
+      ),
+      db.get("SELECT COUNT(*) AS total FROM user_queries")
+    ]);
 
-    return res.json({
+    return success(res, {
       storage: "sqlite",
-      data: queries
+      data: queries,
+      meta: { pagination: { limit, offset, total: totalRow.total } }
     });
   } catch (error) {
-    res.status(500).json({
-      error: "Failed to fetch queries",
+    return fail(res, {
+      statusCode: 500,
+      code: "QUERIES_FETCH_FAILED",
+      message: "Failed to fetch queries",
       details: error.message
     });
   }
 });
 
-router.patch("/:id/resolve", validate(resolveQuerySchema), async (req, res) => {
+router.patch("/:id/resolve", writeLimiter, validate(resolveQuerySchema), async (req, res) => {
   try {
     const { answer } = req.body;
 
     if (!answer || answer.trim() === "") {
-      return res.status(400).json({
-        error: "Answer is required to resolve query"
+      return fail(res, {
+        statusCode: 400,
+        code: "VALIDATION_ERROR",
+        message: "Answer is required to resolve query"
       });
     }
 
     if (answer.length > 3000) {
-      return res.status(400).json({
-        error: "Answer must be 3000 characters or less"
+      return fail(res, {
+        statusCode: 400,
+        code: "VALIDATION_ERROR",
+        message: "Answer must be 3000 characters or less"
       });
     }
 
@@ -249,8 +284,10 @@ router.patch("/:id/resolve", validate(resolveQuerySchema), async (req, res) => {
       );
 
       if (!query) {
-        return res.status(404).json({
-          error: "Query not found"
+        return fail(res, {
+          statusCode: 404,
+          code: "QUERY_NOT_FOUND",
+          message: "Query not found"
         });
       }
 
@@ -271,7 +308,7 @@ router.patch("/:id/resolve", validate(resolveQuerySchema), async (req, res) => {
         message: `${username} answered / commented on: ${query.question.substring(0, 50)}`
       });
 
-      return res.json({
+      return success(res, {
         storage: "mongodb",
         data: query
       });
@@ -293,8 +330,10 @@ router.patch("/:id/resolve", validate(resolveQuerySchema), async (req, res) => {
     );
 
     if (result.changes === 0) {
-      return res.status(404).json({
-        error: "Query not found"
+      return fail(res, {
+        statusCode: 404,
+        code: "QUERY_NOT_FOUND",
+        message: "Query not found"
       });
     }
 
@@ -324,34 +363,36 @@ router.patch("/:id/resolve", validate(resolveQuerySchema), async (req, res) => {
       message: `${username} answered / commented on: ${updated.question.substring(0, 50)}`
     });
 
-    return res.json({
+    return success(res, {
       storage: "sqlite",
       data: updated
     });
   } catch (error) {
-    res.status(500).json({
-      error: "Failed to resolve query",
+    return fail(res, {
+      statusCode: 500,
+      code: "QUERY_RESOLVE_FAILED",
+      message: "Failed to resolve query",
       details: error.message
     });
   }
 });
 
-router.delete("/:id", requireAuth, async (req, res) => {
+router.delete("/:id", requireAuth, writeLimiter, async (req, res) => {
   try {
     if (isMongoAvailable()) {
       const query = await UserQuery.findById(req.params.id);
 
       if (!query) {
-        return res.status(404).json({
-          status: "error",
+        return fail(res, {
+          statusCode: 404,
           code: "QUERY_NOT_FOUND",
           message: "Query not found"
         });
       }
 
       if (!canDeleteResource(req.user, query)) {
-        return res.status(403).json({
-          status: "error",
+        return fail(res, {
+          statusCode: 403,
           code: "FORBIDDEN",
           message: "You are not allowed to delete this query"
         });
@@ -359,8 +400,7 @@ router.delete("/:id", requireAuth, async (req, res) => {
 
       await UserQuery.deleteOne({ _id: query._id });
 
-      return res.json({
-        status: "success",
+      return success(res, {
         storage: "mongodb",
         data: {
           deleted: true
@@ -380,16 +420,16 @@ router.delete("/:id", requireAuth, async (req, res) => {
     );
 
     if (!query) {
-      return res.status(404).json({
-        status: "error",
+      return fail(res, {
+        statusCode: 404,
         code: "QUERY_NOT_FOUND",
         message: "Query not found"
       });
     }
 
     if (!canDeleteResource(req.user, query)) {
-      return res.status(403).json({
-        status: "error",
+      return fail(res, {
+        statusCode: 403,
         code: "FORBIDDEN",
         message: "You are not allowed to delete this query"
       });
@@ -403,16 +443,15 @@ router.delete("/:id", requireAuth, async (req, res) => {
       req.params.id
     );
 
-    return res.json({
-      status: "success",
+    return success(res, {
       storage: "sqlite",
       data: {
         deleted: true
       }
     });
   } catch (error) {
-    res.status(500).json({
-      status: "error",
+    return fail(res, {
+      statusCode: 500,
       code: "QUERY_DELETE_FAILED",
       message: "Failed to delete query",
       details: error.message

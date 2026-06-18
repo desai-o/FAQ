@@ -24,6 +24,7 @@ async function runSqlFile(db, filePath) {
       await db.exec(`${statement};`);
     } catch (error) {
       if (error.message.includes("duplicate column name")) {
+        console.log(`Skipping duplicate column migration statement: "${statement}"`);
         continue;
       }
 
@@ -55,17 +56,23 @@ async function runMigrations(db) {
     if (existing) continue;
 
     const fullPath = path.join(migrationsDir, file);
-    await runSqlFile(db, fullPath);
-
-    await db.run(
-      `
-      INSERT INTO schema_migrations (filename)
-      VALUES (?)
-      `,
-      file
-    );
-
-    console.log(`Applied SQLite migration: ${file}`);
+    
+    await db.exec("BEGIN");
+    try {
+      await runSqlFile(db, fullPath);
+      await db.run(
+        `
+        INSERT INTO schema_migrations (filename)
+        VALUES (?)
+        `,
+        file
+      );
+      await db.exec("COMMIT");
+      console.log(`Applied SQLite migration: ${file}`);
+    } catch (error) {
+      await db.exec("ROLLBACK");
+      throw error;
+    }
   }
 }
 

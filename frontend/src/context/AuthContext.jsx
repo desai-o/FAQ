@@ -17,7 +17,8 @@ export function AuthProvider({ children }) {
       }
 
       try {
-        const response = await fetch("http://localhost:5000/api/auth/me", {
+        const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
+        const response = await fetch(`${apiBaseUrl}/auth/me`, {
           headers: {
             "Authorization": `Bearer ${token}`
           }
@@ -25,7 +26,7 @@ export function AuthProvider({ children }) {
 
         if (response.ok) {
           const data = await response.json();
-          setUser(data.user);
+          setUser(data.user || data.data);
         } else {
           // Token expired or invalid
           localStorage.removeItem("crowdfaq-token");
@@ -45,7 +46,8 @@ export function AuthProvider({ children }) {
     setError(null);
     setLoading(true);
     try {
-      const response = await fetch("http://localhost:5000/api/auth/login", {
+      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
+      const response = await fetch(`${apiBaseUrl}/auth/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -56,7 +58,7 @@ export function AuthProvider({ children }) {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Login failed");
+        throw new Error(data.message || data.error || "Login failed");
       }
 
       localStorage.setItem("crowdfaq-token", data.token);
@@ -74,7 +76,8 @@ export function AuthProvider({ children }) {
     setError(null);
     setLoading(true);
     try {
-      const response = await fetch("http://localhost:5000/api/auth/signup", {
+      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
+      const response = await fetch(`${apiBaseUrl}/auth/signup`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -85,7 +88,7 @@ export function AuthProvider({ children }) {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Signup failed");
+        throw new Error(data.message || data.error || "Signup failed");
       }
 
       localStorage.setItem("crowdfaq-token", data.token);
