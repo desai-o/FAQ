@@ -79,6 +79,10 @@ function Topbar({ openModal }) {
   const dropdownRef = useRef(null);
 
   useEffect(() => {
+    fetch("http://localhost:5000/api/notifications", {
+      headers: { "user-id": "1" }
+    })
+      .then(res => res.json())
     if (!user) {
       setNotifications([]);
       return;
@@ -98,6 +102,11 @@ function Topbar({ openModal }) {
     const nextShow = !showDropdown;
     setShowDropdown(nextShow);
 
+    if (nextShow && unreadCount > 0) {
+      fetch("http://localhost:5000/api/notifications/read", {
+        method: "PATCH",
+        headers: { "user-id": "1", "Content-Type": "application/json" }
+      })
     if (nextShow && unreadCount > 0 && user) {
       markNotificationsAsRead()
         .then(() => {
@@ -157,6 +166,9 @@ function Topbar({ openModal }) {
                   <p style={{ margin: 0, padding: "20px", textAlign: "center", color: "#999", fontSize: "13px" }}>No notifications yet.</p>
                 ) : (
                   notifications.map(n => (
+                    <div key={n.id} style={{ padding: "12px 16px", borderBottom: "1px solid #f0f0f0", display: "flex", flexDirection: "column", gap: "4px" }}>
+                      <p style={{ margin: 0, fontSize: "13px", color: "#1a1a1a", lineHeight: 1.4 }}>{n.message || "Someone interacted with your post."}</p>
+                      <span style={{ fontSize: "11px", color: "#999" }}>{new Date(n.created_at).toLocaleString()}</span>
                     <div key={n._id || n.id} style={{ padding: "12px 16px", borderBottom: "1px solid var(--border)", display: "flex", flexDirection: "column", gap: "4px" }}>
                       <p style={{ margin: 0, fontSize: "13px", color: "var(--text-primary)", lineHeight: 1.4 }}>{n.message || "Someone interacted with your post."}</p>
                       <span style={{ fontSize: "11px", color: "var(--text-secondary)" }}>{new Date(n.created_at || n.createdAt).toLocaleString()}</span>

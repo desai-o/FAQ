@@ -70,6 +70,8 @@ router.post("/", writeLimiter, validate(createAnswerSchema), async (req, res) =>
         }
       });
 
+      return res.status(201).json({
+        status: "success",
       await dispatchNotification({
         eventType: "answer_created",
         triggeredByUserId: actorId,
@@ -120,6 +122,8 @@ router.post("/", writeLimiter, validate(createAnswerSchema), async (req, res) =>
       }
     });
 
+    return res.status(201).json({
+      status: "success",
     await dispatchNotification({
       eventType: "answer_created",
       triggeredByUserId: actorId,
