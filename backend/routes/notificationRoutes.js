@@ -26,6 +26,21 @@ const markReadSchema = z.object({
   query: z.object({}).optional()
 });
 
+function normalizeSqliteNotification(item) {
+  return {
+    id: String(item.id),
+    userId: item.user_id,
+    followId: item.follow_id,
+    message: item.message,
+    eventType: item.event_type || "",
+    followableType: item.followable_type || "",
+    followableId: item.followable_id || "",
+    isRead: Boolean(item.is_read),
+    createdAt: item.created_at,
+    updatedAt: item.updated_at
+  };
+}
+
 router.get("/", requireAuth, validate(getNotificationsSchema), async (req, res) => {
   try {
     const userId = req.user.id;
@@ -89,19 +104,7 @@ router.get("/", requireAuth, validate(getNotificationsSchema), async (req, res) 
 
     return success(res, {
       storage: "sqlite",
-      data: notifications.map((item) => ({
-        id: String(item.id),
-        _id: String(item.id),
-        userId: item.user_id,
-        followId: item.follow_id,
-        message: item.message,
-        eventType: item.event_type || "",
-        followableType: item.followable_type || "",
-        followableId: item.followable_id || "",
-        isRead: Boolean(item.is_read),
-        createdAt: item.created_at,
-        updatedAt: item.updated_at
-      })),
+      data: notifications.map(normalizeSqliteNotification),
       meta: { pagination: { limit, offset, total: totalRow.total } }
     });
   } catch (error) {
@@ -109,6 +112,67 @@ router.get("/", requireAuth, validate(getNotificationsSchema), async (req, res) 
       statusCode: 500,
       code: "NOTIFICATIONS_FETCH_FAILED",
       message: "Failed to fetch notifications",
+      details: error.message
+    });
+  }
+});
+
+router.patch("/:id/read", requireAuth, writeLimiter, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    if (isMongoAvailable()) {
+      const notification = await Notification.findOneAndUpdate(
+        { _id: req.params.id, userId },
+        { isRead: true },
+        { new: true }
+      );
+
+      if (!notification) {
+        return fail(res, {
+          statusCode: 404,
+          code: "NOTIFICATION_NOT_FOUND",
+          message: "Notification not found"
+        });
+      }
+
+      return success(res, {
+        storage: "mongodb",
+        data: notification
+      });
+    }
+
+    const db = getSQLiteDb();
+
+    const result = await db.run(
+      `
+      UPDATE notifications
+      SET is_read = 1,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+        AND user_id = ?
+      `,
+      req.params.id,
+      userId
+    );
+
+    if (result.changes === 0) {
+      return fail(res, {
+        statusCode: 404,
+        code: "NOTIFICATION_NOT_FOUND",
+        message: "Notification not found"
+      });
+    }
+
+    return success(res, {
+      storage: "sqlite",
+      data: { updated: true }
+    });
+  } catch (error) {
+    return fail(res, {
+      statusCode: 500,
+      code: "NOTIFICATION_MARK_READ_FAILED",
+      message: "Failed to mark notification as read",
       details: error.message
     });
   }
@@ -175,6 +239,64 @@ router.patch("/read", requireAuth, writeLimiter, validate(markReadSchema), async
       statusCode: 500,
       code: "NOTIFICATIONS_MARK_READ_FAILED",
       message: "Failed to mark notifications as read",
+      details: error.message
+    });
+  }
+});
+
+router.delete("/:id", requireAuth, writeLimiter, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    if (isMongoAvailable()) {
+      const result = await Notification.deleteOne({
+        _id: req.params.id,
+        userId
+      });
+
+      if (result.deletedCount === 0) {
+        return fail(res, {
+          statusCode: 404,
+          code: "NOTIFICATION_NOT_FOUND",
+          message: "Notification not found"
+        });
+      }
+
+      return success(res, {
+        storage: "mongodb",
+        data: { deleted: true }
+      });
+    }
+
+    const db = getSQLiteDb();
+
+    const result = await db.run(
+      `
+      DELETE FROM notifications
+      WHERE id = ?
+        AND user_id = ?
+      `,
+      req.params.id,
+      userId
+    );
+
+    if (result.changes === 0) {
+      return fail(res, {
+        statusCode: 404,
+        code: "NOTIFICATION_NOT_FOUND",
+        message: "Notification not found"
+      });
+    }
+
+    return success(res, {
+      storage: "sqlite",
+      data: { deleted: true }
+    });
+  } catch (error) {
+    return fail(res, {
+      statusCode: 500,
+      code: "NOTIFICATION_DELETE_FAILED",
+      message: "Failed to delete notification",
       details: error.message
     });
   }
