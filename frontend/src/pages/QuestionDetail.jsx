@@ -1,3 +1,4 @@
+import { apiRequest } from "../api/client";
 import { useState, useEffect, useRef } from "react";
 import { Link, useParams } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
@@ -106,9 +107,14 @@ function QuestionDetail() {
   const handleFollowClick = async () => {
     if (!followData.isFollowing) {
       try {
-        const res = await followResource("question", question.id);
-        const followId = res.data?._id || res.data?.id || followData.followId;
-        setFollowData({ isFollowing: true, isMuted: false, followId });
+        const data = await apiRequest("/follows", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+        const followData = data;
+        if (res.ok || res.status === 409) {
+          setFollowData({ isFollowing: true, isMuted: false, followId: data.id || followData.followId });
+        }
       } catch (err) {
         console.error("Failed to follow", err);
         setError(err.message || "Failed to follow.");
@@ -121,7 +127,9 @@ function QuestionDetail() {
   const handleUnfollow = async () => {
     try {
       if (followData.followId) {
-        await unfollowResource(followData.followId);
+        await apiRequest(`/follows/${followData.followId}`, {
+          method: "DELETE",
+        });
       }
       setFollowData({ isFollowing: false, isMuted: false, followId: null });
       setShowFollowMenu(false);
@@ -134,7 +142,9 @@ function QuestionDetail() {
   const handleMuteToggle = async () => {
     try {
       if (followData.followId) {
-        await muteFollow(followData.followId, !followData.isMuted);
+        await apiRequest(`/follows/${followData.followId}/mute`, {
+          method: "PATCH",
+        });
       }
       setFollowData(prev => ({ ...prev, isMuted: !prev.isMuted }));
       setShowFollowMenu(false);
@@ -166,36 +176,23 @@ function QuestionDetail() {
   const generateSummary = async () => {
     try {
       setSummaryLoading(true);
-      setSummaryError("");
-      setSummary("");
-
-      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
-
-      const response = await fetch(`${apiBaseUrl}/summary`, {
+      
+      const data = await apiRequest("/summary", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
         body: JSON.stringify({
-          question: question.title || question.question,
-          answers: (answers || []).map((a) => a.content)
-        })
+          question: question.title,
+          answers: question.answers.map((a) => a.content),
+        }),
       });
-
-      if (!response.ok) {
-        throw new Error(`Failed to generate summary: ${response.status}`);
-      }
-
-      const data = await response.json();
+      
       setSummary(data.summary);
     } catch (err) {
       console.error(err);
-      setSummaryError(err.message || "Failed to generate summary.");
+      setSummary("Failed to generate summary.");
     } finally {
       setSummaryLoading(false);
     }
-  };
-
+};
   return (
     <>
       <Sidebar />
