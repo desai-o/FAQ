@@ -4226,10 +4226,7 @@ input, select, textarea {
   .landing-container .landing-stats-item:not(:last-child)::after {
     display: none !important;
   }
-<<<<<<< HEAD
- HEAD
-=======
->>>>>>> a026b05cfd788111e7214c98f161cfb02b362f20
+ 
 }
 
 /* ── SIDEBAR TOGGLE & DIRECT LOGOUT BUTTONS ── */
@@ -4440,9 +4437,6 @@ input, select, textarea {
     box-shadow: 0 10px 25px rgba(99,102,241,0.5);
     transform: scale(1);
   }
-<<<<<<< HEAD
 
- origin/main
-=======
->>>>>>> a026b05cfd788111e7214c98f161cfb02b362f20
+
 }

@@ -186,10 +186,7 @@ function Login() {
         </button>
       </div>
 
-<<<<<<< HEAD
- HEAD
-=======
->>>>>>> a026b05cfd788111e7214c98f161cfb02b362f20
+ 
       {/* Right panel: Form card */}
       <div className="auth-right-panel">
         {/* Background glow ornaments */}
@@ -204,7 +201,6 @@ function Login() {
           </svg>
           Back to Homepage
         </Link>
-<<<<<<< HEAD
 
         <div className="auth-theme-float">
           <button
@@ -228,8 +224,6 @@ function Login() {
             </div>
           </button>
 
-=======
->>>>>>> a026b05cfd788111e7214c98f161cfb02b362f20
       {/* Auth Card */}
       <div className="auth-card">
         <div className="auth-header">
@@ -238,10 +232,7 @@ function Login() {
             <span>CrowdFAQ</span>
           </div>
           <p className="auth-subtitle">Welcome back! Sign in to your account</p>
-<<<<<<< HEAD
- origin/main
-=======
->>>>>>> a026b05cfd788111e7214c98f161cfb02b362f20
+ 
         </div>
 
         <form onSubmit={handleSubmit} className="auth-form">
@@ -278,14 +269,11 @@ function Login() {
               />
             </div>
           </div>
-<<<<<<< HEAD
- HEAD
+ 
           <div className="auth-switch" style={{ marginTop: "12px" }}>
             Are you an administrator? 
             <Link to="/admin/login" className="auth-switch-link" style={{ color: "var(--accent-purple)", fontWeight: "600" }} tabIndex={11}>Admin Portal</Link>
           </div>
-=======
->>>>>>> a026b05cfd788111e7214c98f161cfb02b362f20
 
           <div className="auth-input-group">
             <label className="auth-label" htmlFor="password">Password</label>
@@ -369,24 +357,10 @@ function Login() {
           Continue with Google
         </button>
 
-<<<<<<< HEAD
         <div className="auth-switch">
           Don't have an account? 
           <Link to="/signup" className="auth-switch-link" tabIndex={10}>Sign Up</Link>
- origin/main
-=======
-          <div className="auth-switch">
-            Don't have an account? 
-            <Link to="/signup" className="auth-switch-link" tabIndex={10}>Sign Up</Link>
-          </div>
-          <div className="auth-switch" style={{ marginTop: "12px" }}>
-            Are you an administrator? 
-            <Link to="/admin/login" className="auth-switch-link" style={{ color: "var(--accent-purple)", fontWeight: "600" }} tabIndex={11}>Admin Portal</Link>
-          </div>
-        <div className="auth-switch">
-          Don't have an account? 
-          <Link to="/signup" className="auth-switch-link" tabIndex={10}>Sign Up</Link>
->>>>>>> a026b05cfd788111e7214c98f161cfb02b362f20
+ 
         </div>
       </div>
     </div>

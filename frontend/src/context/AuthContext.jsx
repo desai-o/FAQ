@@ -45,12 +45,12 @@ export function AuthProvider({ children }) {
 
       localStorage.setItem("crowdfaq-token", data.token);
       setUser(data.user);
- HEAD
+ 
       return { success: true, user: data.user };
 
 
       return { success: true };
-     origin/main
+     
     } catch (err) {
       setError(err.message);
 
@@ -75,7 +75,7 @@ export function AuthProvider({ children }) {
 
       localStorage.setItem("crowdfaq-token", data.token);
       setUser(data.user);
- HEAD
+ 
       return { success: true, user: data.user };
     } catch (err) {
       setError(err.message);
@@ -109,7 +109,7 @@ export function AuthProvider({ children }) {
 
 
       return { success: true };
- origin/main
+ 
     } catch (err) {
       setError(err.message);
 
@@ -143,7 +143,6 @@ export function AuthProvider({ children }) {
   };
 
   return (
- HEAD
     <AuthContext.Provider value={{ user, loading, error, login, signup, loginWithGoogle, logout }}>
 
     <AuthContext.Provider
@@ -156,7 +155,6 @@ export function AuthProvider({ children }) {
         logout,
       }}
     >
- origin/main
       {children}
     </AuthContext.Provider>
   );
