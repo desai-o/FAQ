@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useFAQ } from "../context/FAQContext";
 import { useTheme } from "../context/ThemeContext";
 import { useNavigate } from "react-router-dom";
-
+import { apiRequest } from "../api/client";
 import ProfileDropdown from "./ProfileDropdown";
 import { useAuth } from "../context/AuthContext";
 
@@ -78,17 +78,16 @@ function Topbar({ openModal }) {
   const dropdownRef = useRef(null);
 
   useEffect(() => {
-    fetch("http://localhost:5000/api/notifications", {
-      headers: { "user-id": "1" }
+    apiRequest("/notifications")
+    .then((data) => {
+      if (data?.data) {
+        setNotifications(data.data);
+      }
     })
-      .then(res => res.json())
-      .then(data => {
-        if (data && data.data) {
-          setNotifications(data.data);
-        }
-      })
-      .catch(err => console.error("Failed to fetch notifications:", err));
-  }, []);
+    .catch((err) =>
+      console.error("Failed to fetch notifications:", err)
+  );
+}, []);
 
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
@@ -97,16 +96,20 @@ function Topbar({ openModal }) {
     setShowDropdown(nextShow);
 
     if (nextShow && unreadCount > 0) {
-      fetch("http://localhost:5000/api/notifications/read", {
+      apiRequest("/notifications/read", {
         method: "PATCH",
-        headers: { "user-id": "1", "Content-Type": "application/json" }
       })
-        .then(() => {
-          setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
-        })
-        .catch(err => console.error("Failed to mark notifications as read:", err));
-    }
-  };
+      .then(() => {
+        setNotifications((prev) =>
+          prev.map((n) => ({ ...n, is_read: true }))
+      );
+    })
+    .catch((err) =>
+      console.error("Failed to mark notifications as read:", err)
+  );
+}
+
+};
 
   useEffect(() => {
     const handleClickOutside = (event) => {

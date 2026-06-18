@@ -1,3 +1,4 @@
+import { apiRequest } from "../api/client";
 import { useState, useEffect, useRef } from "react";
 import { Link, useParams } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
@@ -51,12 +52,11 @@ function QuestionDetail() {
   const handleFollowClick = async () => {
     if (!followData.isFollowing) {
       try {
-        const res = await fetch("http://localhost:5000/api/follows", {
+        const data = await apiRequest("/follows", {
           method: "POST",
-          headers: { "Content-Type": "application/json", "user-id": "1" },
-          body: JSON.stringify({ followable_type: "question", followable_id: question.id })
+          body: JSON.stringify(payload),
         });
-        const data = await res.json();
+        const followData = data;
         if (res.ok || res.status === 409) {
           setFollowData({ isFollowing: true, isMuted: false, followId: data.id || followData.followId });
         }
@@ -71,9 +71,8 @@ function QuestionDetail() {
   const handleUnfollow = async () => {
     try {
       if (followData.followId) {
-        await fetch(`http://localhost:5000/api/follows/${followData.followId}`, {
+        await apiRequest(`/follows/${followData.followId}`, {
           method: "DELETE",
-          headers: { "user-id": "1" }
         });
       }
       setFollowData({ isFollowing: false, isMuted: false, followId: null });
@@ -86,10 +85,8 @@ function QuestionDetail() {
   const handleMuteToggle = async () => {
     try {
       if (followData.followId) {
-        await fetch(`http://localhost:5000/api/follows/${followData.followId}/mute`, {
+        await apiRequest(`/follows/${followData.followId}/mute`, {
           method: "PATCH",
-          headers: { "Content-Type": "application/json", "user-id": "1" },
-          body: JSON.stringify({ is_muted: !followData.isMuted })
         });
       }
       setFollowData(prev => ({ ...prev, isMuted: !prev.isMuted }));
@@ -119,34 +116,25 @@ function QuestionDetail() {
   };
 
   const generateSummary = async () => {
-  try {
-    setSummaryLoading(true);
-
-    const response = await fetch(
-      "http://localhost:5000/api/summary",
-      {
+    try {
+      setSummaryLoading(true);
+      
+      const data = await apiRequest("/summary", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify({
           question: question.title,
           answers: question.answers.map((a) => a.content),
         }),
-      }
-    );
-
-    const data = await response.json();
-
-    setSummary(data.summary);
-  } catch (err) {
-    console.error(err);
-    setSummary("Failed to generate summary.");
-  } finally {
-    setSummaryLoading(false);
-  }
-  };
-
+      });
+      
+      setSummary(data.summary);
+    } catch (err) {
+      console.error(err);
+      setSummary("Failed to generate summary.");
+    } finally {
+      setSummaryLoading(false);
+    }
+};
   return (
     <>
       <Sidebar />

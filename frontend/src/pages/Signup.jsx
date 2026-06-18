@@ -165,7 +165,10 @@ function Signup() {
         </button>
       </div>
 
+<<<<<<< HEAD
  HEAD
+=======
+>>>>>>> a026b05cfd788111e7214c98f161cfb02b362f20
       {/* Right panel: Form card */}
       <div className="auth-right-panel">
         {/* Background glow ornaments */}
@@ -180,6 +183,7 @@ function Signup() {
           </svg>
           Back to Homepage
         </Link>
+<<<<<<< HEAD
 
         <div className="auth-theme-float">
           <button
@@ -203,6 +207,8 @@ function Signup() {
             </div>
           </button>
 
+=======
+>>>>>>> a026b05cfd788111e7214c98f161cfb02b362f20
       {/* Auth Card */}
       <div className="auth-card">
         <div className="auth-header">
@@ -211,7 +217,10 @@ function Signup() {
             <span>CrowdFAQ</span>
           </div>
           <p className="auth-subtitle">Join us! Create a new account to get started</p>
+<<<<<<< HEAD
  origin/main
+=======
+>>>>>>> a026b05cfd788111e7214c98f161cfb02b362f20
         </div>
 
         <form onSubmit={handleSubmit} className="auth-form">
