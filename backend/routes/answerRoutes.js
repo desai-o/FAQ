@@ -164,6 +164,8 @@ router.post("/", requireAuth, writeLimiter, validate(createAnswerSchema), async 
         }
       });
 
+      return res.status(201).json({
+        status: "success",
       await dispatchNotification({
         eventType: "answer_created",
         triggeredByUserId: actorId,
@@ -214,6 +216,8 @@ router.post("/", requireAuth, writeLimiter, validate(createAnswerSchema), async 
       }
     });
 
+    return res.status(201).json({
+      status: "success",
     await dispatchNotification({
       eventType: "answer_created",
       triggeredByUserId: actorId,

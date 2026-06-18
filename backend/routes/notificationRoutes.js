@@ -60,6 +60,18 @@ router.get("/", requireAuth, validate(getNotificationsSchema), async (req, res) 
     }
 
     const db = getSQLiteDb();
+    const notifications = await db.all(`
+      SELECT * FROM notifications 
+      WHERE user_id = ? 
+      ORDER BY created_at DESC
+    `, user_id);
+    
+    const formatted = notifications.map(n => ({
+      ...n,
+      is_read: !!n.is_read
+    }));
+
+    res.json({ data: formatted });
 
     const user = await db.get(
       `
@@ -201,6 +213,9 @@ router.patch("/read", requireAuth, writeLimiter, validate(markReadSchema), async
     }
 
     const db = getSQLiteDb();
+    await db.run(
+      `UPDATE notifications SET is_read = 1 WHERE user_id = ?`, 
+      user_id
 
     const user = await db.get(
       `

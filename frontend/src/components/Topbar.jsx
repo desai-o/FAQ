@@ -91,6 +91,10 @@ function Topbar({ openModal }) {
   const dropdownRef = useRef(null);
 
   useEffect(() => {
+    fetch("http://localhost:5000/api/notifications", {
+      headers: { "user-id": "1" }
+    })
+      .then(res => res.json())
     if (!user) {
       setNotifications([]);
       return;
@@ -146,17 +150,19 @@ function Topbar({ openModal }) {
   function handleSearchSubmit(event) {
     event.preventDefault();
 
-    const trimmed = searchQuery.trim();
-    if (!trimmed || isSearchSubmitting) return;
-
-    setIsSearchSubmitting(true);
-
-    navigate(`/questions?search=${encodeURIComponent(trimmed)}`);
-
-    window.setTimeout(() => {
-      setIsSearchSubmitting(false);
-    }, 500);
-  }
+    if (nextShow && unreadCount > 0) {
+      fetch("http://localhost:5000/api/notifications/read", {
+        method: "PATCH",
+        headers: { "user-id": "1", "Content-Type": "application/json" }
+      })
+    if (nextShow && unreadCount > 0 && user) {
+      markNotificationsAsRead()
+        .then(() => {
+          setNotifications(prev => prev.map(n => ({ ...n, isRead: true, is_read: true })));
+        })
+        .catch(err => console.error("Failed to mark notifications as read:", err));
+    }
+  };
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -196,26 +202,15 @@ function Topbar({ openModal }) {
                 {notifications.length === 0 ? (
                   <div className="notification-empty">No notifications yet</div>
                 ) : (
-                  notifications.map((notification) => {
-                    const id = getNotificationId(notification);
-                    const isRead = isNotificationRead(notification);
-
-                    return (
-                      <button
-                        key={id}
-                        type="button"
-                        className={`notification-item ${isRead ? "" : "unread"}`}
-                        onClick={() => handleMarkNotificationRead(id)}
-                      >
-                        <span className="notification-message">{notification.message}</span>
-                        {getNotificationCreatedAt(notification) && (
-                          <span className="notification-time">
-                            {new Date(getNotificationCreatedAt(notification)).toLocaleString()}
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })
+                  notifications.map(n => (
+                    <div key={n.id} style={{ padding: "12px 16px", borderBottom: "1px solid #f0f0f0", display: "flex", flexDirection: "column", gap: "4px" }}>
+                      <p style={{ margin: 0, fontSize: "13px", color: "#1a1a1a", lineHeight: 1.4 }}>{n.message || "Someone interacted with your post."}</p>
+                      <span style={{ fontSize: "11px", color: "#999" }}>{new Date(n.created_at).toLocaleString()}</span>
+                    <div key={n._id || n.id} style={{ padding: "12px 16px", borderBottom: "1px solid var(--border)", display: "flex", flexDirection: "column", gap: "4px" }}>
+                      <p style={{ margin: 0, fontSize: "13px", color: "var(--text-primary)", lineHeight: 1.4 }}>{n.message || "Someone interacted with your post."}</p>
+                      <span style={{ fontSize: "11px", color: "var(--text-secondary)" }}>{new Date(n.created_at || n.createdAt).toLocaleString()}</span>
+                    </div>
+                  ))
                 )}
               </div>
             </div>
