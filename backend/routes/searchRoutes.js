@@ -9,6 +9,8 @@ const FAQ = require("../models/FAQ");
 const UserQuery = require("../models/UserQuery");
 const { trackEvent } = require("../services/eventService");
 
+const { searchLimiter } = require("../middleware/rateLimits");
+
 const searchSchema = z.object({
   body: z.object({
     keyword: z.string().max(200).optional(),
@@ -20,7 +22,7 @@ const searchSchema = z.object({
   query: z.object({}).optional()
 });
 
-router.post("/", validate(searchSchema), async (req, res) => {
+router.post("/", searchLimiter, validate(searchSchema), async (req, res) => {
   try {
     const { keyword, keywords } = req.body;
 

@@ -35,12 +35,12 @@ function TrendingQuestions() {
                   <span className="tag category">{q.category}</span>
                 </div>
                 <h3 className="q-title">
-                  <Link to={`/question/${q.id}`}>{q.title}</Link>
+                  <Link to={`/questions/${q.id}`}>{q.title}</Link>
                 </h3>
                 <p className="q-excerpt">{q.excerpt}</p>
                 <div className="q-footer">
                   <div className="q-hashtags">
-                    {q.hashtags.map((tag) => (
+                    {(Array.isArray(q.hashtags) ? q.hashtags : []).map((tag) => (
                       <Hashtag key={tag} tag={tag} />
                     ))}
                   </div>

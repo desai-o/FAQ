@@ -1,38 +1,58 @@
-const API_BASE_URL = "http://localhost:5000/api";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
+const API_TIMEOUT_MS = 10000;
+const MAX_RETRIES = 2;
 
-async function request(path, options = {}) {
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function request(path, options = {}, attempt = 0) {
   const token = localStorage.getItem("crowdfaq-token");
-  const headers = {
-    "Content-Type": "application/json",
-    ...(token ? { "Authorization": `Bearer ${token}` } : {}),
-    ...(options.headers || {})
-  };
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...options,
-    headers
-  });
+  try {
+    const response = await fetch(`${API_BASE_URL}${path}`, {
+      ...options,
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+        ...(options.headers || {})
+      }
+    });
 
-  const data = await response.json().catch(() => null);
+    const text = await response.text();
+    const payload = text ? JSON.parse(text) : {};
 
-  if (!response.ok) {
-    const message =
-      data?.message ||
-      data?.error ||
-      `Request failed with status ${response.status}`;
+    if (!response.ok) {
+      throw new Error(payload.message || payload.error || `Request failed: ${response.status}`);
+    }
 
-    throw new Error(message);
+    return payload;
+  } catch (error) {
+    const retryable =
+      error.name === "AbortError" ||
+      error.message.includes("Failed to fetch") ||
+      error.message.includes("NetworkError");
+
+    if (retryable && attempt < MAX_RETRIES) {
+      await sleep(300 * 2 ** attempt);
+      return request(path, options, attempt + 1);
+    }
+
+    throw error;
+  } finally {
+    clearTimeout(timeout);
   }
-
-  return data;
 }
 
-export async function fetchFaqs() {
-  return request("/faqs");
+export async function fetchFaqs(limit = 20, offset = 0) {
+  return request(`/faqs?limit=${limit}&offset=${offset}`);
 }
 
-export async function fetchQueries() {
-  return request("/queries");
+export async function fetchQueries(limit = 20, offset = 0) {
+  return request(`/queries?limit=${limit}&offset=${offset}`);
 }
 
 export async function searchFaq(keyword) {
@@ -63,8 +83,8 @@ export async function submitAnswer(payload) {
   });
 }
 
-export async function fetchAnswers(questionId) {
-  return request(`/answers/${questionId}`);
+export async function fetchAnswers(questionId, limit = 20, offset = 0) {
+  return request(`/answers/${questionId}?limit=${limit}&offset=${offset}`);
 }
 
 export async function toggleVote(payload) {

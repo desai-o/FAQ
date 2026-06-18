@@ -44,13 +44,19 @@ async function dispatchNotification(eventConfig) {
             user_id,
             follow_id,
             message,
+            event_type,
+            followable_type,
+            followable_id,
             is_read
           )
-          VALUES (?, ?, ?, 0)
+          VALUES (?, ?, ?, ?, ?, ?, 0)
           `,
           String(targetUserId),
           follower.id || null,
-          message
+          message,
+          eventType || "",
+          followableType,
+          String(followableId)
         );
       }
     }

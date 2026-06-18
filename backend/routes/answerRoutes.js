@@ -1,40 +1,66 @@
 const express = require("express");
 const router = express.Router();
+const { z } = require("zod");
+const { validate } = require("../middleware/validate");
 
 const { isMongoAvailable } = require("../db/mongo");
 const { getSQLiteDb } = require("../db/sqlite");
 const Answer = require("../models/Answer");
 const { trackEvent } = require("../services/eventService");
+const { requireAuth } = require("../middleware/auth");
+const { canDeleteResource } = require("../middleware/ownership");
+const { dispatchNotification } = require("../services/notificationService");
+const { getPagination } = require("../utils/pagination");
+const { success, fail } = require("../utils/apiResponse");
+const { writeLimiter } = require("../middleware/rateLimits");
 
-router.post("/", async (req, res) => {
+const createAnswerSchema = z.object({
+  body: z.object({
+    questionId: z.string().trim().min(1).optional().nullable(),
+    queryId: z.string().trim().min(1).optional().nullable(),
+    content: z.string().trim().min(1).max(5000),
+    author: z.string().trim().max(100).optional().nullable()
+  }),
+  params: z.object({}).optional(),
+  query: z.object({}).optional()
+});
+
+router.post("/", writeLimiter, validate(createAnswerSchema), async (req, res) => {
   try {
     const { questionId, queryId, content, author } = req.body;
 
     if (!content || content.trim() === "") {
-      return res.status(400).json({
-        error: "Answer content is required"
+      return fail(res, {
+        statusCode: 400,
+        code: "VALIDATION_ERROR",
+        message: "Answer content is required"
       });
     }
 
     if (!questionId && !queryId) {
-      return res.status(400).json({
-        error: "questionId or queryId is required"
+      return fail(res, {
+        statusCode: 400,
+        code: "VALIDATION_ERROR",
+        message: "questionId or queryId is required"
       });
     }
+
+    const actorId = req.user?.id || "anonymous";
+    const actorName = req.user?.name || author || "Community Member";
 
     if (isMongoAvailable()) {
       const answer = await Answer.create({
         questionId: questionId || null,
         queryId: queryId || null,
         content: content.trim(),
-        author: author || req.user?.name || "Community Member",
-        userId: req.user?.id || "anonymous",
-        authorName: req.user?.name || author || "Community Member"
+        author: actorName,
+        userId: actorId,
+        authorName: actorName
       });
 
       await trackEvent({
         type: "answer_created",
-        userId: author || "anonymous",
+        userId: actorId,
         targetType: "answer",
         targetId: String(answer._id),
         metadata: {
@@ -44,8 +70,16 @@ router.post("/", async (req, res) => {
         }
       });
 
-      return res.status(201).json({
-        status: "success",
+      await dispatchNotification({
+        eventType: "answer_created",
+        triggeredByUserId: actorId,
+        followableType: "question",
+        followableId: String(questionId || queryId),
+        message: `New answer posted: "${content.substring(0, 40)}..."`
+      }).catch(err => console.error("Error dispatching notification:", err));
+
+      return success(res, {
+        statusCode: 201,
         storage: "mongodb",
         data: answer
       });
@@ -69,14 +103,14 @@ router.post("/", async (req, res) => {
       questionId || null,
       queryId || null,
       content.trim(),
-      author || req.user?.name || "Community Member",
-      req.user?.id || "anonymous",
-      req.user?.name || author || "Community Member"
+      actorName,
+      actorId,
+      actorName
     );
 
     await trackEvent({
       type: "answer_created",
-      userId: author || "anonymous",
+      userId: actorId,
       targetType: "answer",
       targetId: String(result.lastID),
       metadata: {
@@ -86,22 +120,32 @@ router.post("/", async (req, res) => {
       }
     });
 
-    return res.status(201).json({
-      status: "success",
+    await dispatchNotification({
+      eventType: "answer_created",
+      triggeredByUserId: actorId,
+      followableType: "question",
+      followableId: String(questionId || queryId),
+      message: `New answer posted: "${content.substring(0, 40)}..."`
+    }).catch(err => console.error("Error dispatching notification:", err));
+
+    return success(res, {
+      statusCode: 201,
       storage: "sqlite",
       data: {
         id: result.lastID,
         questionId,
         queryId,
         content: content.trim(),
-        author: author || "Community Member",
+        author: actorName,
         votes: 0,
         isBest: false
       }
     });
   } catch (error) {
-    res.status(500).json({
-      error: "Failed to submit answer",
+    return fail(res, {
+      statusCode: 500,
+      code: "ANSWER_CREATE_FAILED",
+      message: "Failed to submit answer",
       details: error.message
     });
   }
@@ -110,58 +154,71 @@ router.post("/", async (req, res) => {
 router.get("/:questionId", async (req, res) => {
   try {
     const { questionId } = req.params;
+    const { limit, offset } = getPagination(req.query);
 
     if (isMongoAvailable()) {
-      const answers = await Answer.find({ questionId }).sort({ createdAt: -1 });
+      const [answers, total] = await Promise.all([
+        Answer.find({ questionId }).sort({ createdAt: -1 }).skip(offset).limit(limit),
+        Answer.countDocuments({ questionId })
+      ]);
 
-      return res.json({
-        status: "success",
+      return success(res, {
         storage: "mongodb",
-        data: answers
+        data: answers,
+        meta: { pagination: { limit, offset, total } }
       });
     }
 
     const db = getSQLiteDb();
 
-    const answers = await db.all(
-      `
-      SELECT *
-      FROM answers
-      WHERE question_id = ?
-      ORDER BY created_at DESC
-      `,
-      questionId
-    );
+    const [answers, totalRow] = await Promise.all([
+      db.all(
+        `
+        SELECT *
+        FROM answers
+        WHERE question_id = ?
+        ORDER BY created_at DESC
+        LIMIT ?
+        OFFSET ?
+        `,
+        questionId,
+        limit,
+        offset
+      ),
+      db.get("SELECT COUNT(*) AS total FROM answers WHERE question_id = ?", questionId)
+    ]);
 
-    return res.json({
-      status: "success",
+    return success(res, {
       storage: "sqlite",
-      data: answers
+      data: answers,
+      meta: { pagination: { limit, offset, total: totalRow.total } }
     });
   } catch (error) {
-    res.status(500).json({
-      error: "Failed to fetch answers",
+    return fail(res, {
+      statusCode: 500,
+      code: "ANSWERS_FETCH_FAILED",
+      message: "Failed to fetch answers",
       details: error.message
     });
   }
 });
 
-router.delete("/:id", requireAuth, async (req, res) => {
+router.delete("/:id", requireAuth, writeLimiter, async (req, res) => {
   try {
     if (isMongoAvailable()) {
       const answer = await Answer.findById(req.params.id);
 
       if (!answer) {
-        return res.status(404).json({
-          status: "error",
+        return fail(res, {
+          statusCode: 404,
           code: "ANSWER_NOT_FOUND",
           message: "Answer not found"
         });
       }
 
       if (!canDeleteResource(req.user, answer)) {
-        return res.status(403).json({
-          status: "error",
+        return fail(res, {
+          statusCode: 403,
           code: "FORBIDDEN",
           message: "You are not allowed to delete this answer"
         });
@@ -169,8 +226,7 @@ router.delete("/:id", requireAuth, async (req, res) => {
 
       await Answer.deleteOne({ _id: answer._id });
 
-      return res.json({
-        status: "success",
+      return success(res, {
         storage: "mongodb",
         data: {
           deleted: true
@@ -190,16 +246,16 @@ router.delete("/:id", requireAuth, async (req, res) => {
     );
 
     if (!answer) {
-      return res.status(404).json({
-        status: "error",
+      return fail(res, {
+        statusCode: 404,
         code: "ANSWER_NOT_FOUND",
         message: "Answer not found"
       });
     }
 
     if (!canDeleteResource(req.user, answer)) {
-      return res.status(403).json({
-        status: "error",
+      return fail(res, {
+        statusCode: 403,
         code: "FORBIDDEN",
         message: "You are not allowed to delete this answer"
       });
@@ -213,16 +269,15 @@ router.delete("/:id", requireAuth, async (req, res) => {
       req.params.id
     );
 
-    return res.json({
-      status: "success",
+    return success(res, {
       storage: "sqlite",
       data: {
         deleted: true
       }
     });
   } catch (error) {
-    res.status(500).json({
-      status: "error",
+    return fail(res, {
+      statusCode: 500,
       code: "ANSWER_DELETE_FAILED",
       message: "Failed to delete answer",
       details: error.message
