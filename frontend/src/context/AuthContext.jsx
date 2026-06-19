@@ -78,86 +78,48 @@ export function AuthProvider({ children }) {
  
       return { success: true, user: data.user };
     } catch (err) {
-      setError(err.message);
-      return { success: false, error: err.message };
-    } finally {
-      setLoading(false);
-    }
+  setError(err.message);
+
+  return {
+    success: false,
+    error: err.message,
   };
+} finally {
+  setLoading(false);
+}
+};
 
-  const loginWithGoogle = async (credential) => {
-    setError(null);
-    setLoading(true);
-    try {
-      const response = await fetch("http://localhost:5000/api/auth/google", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ credential })
-      });
+const logout = () => {
+  localStorage.clear();
+  sessionStorage.clear();
 
-      const data = await response.json();
+  document.cookie.split(";").forEach((c) => {
+    document.cookie = c
+      .replace(/^ +/, "")
+      .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+  });
 
-      if (!response.ok) {
-        throw new Error(data.error || "Google sign-in failed");
-      }
+  setUser(null);
+  setError(null);
 
-      localStorage.setItem("crowdfaq-token", data.token);
-      setUser(data.user);
-      return { success: true, user: data.user };
+  window.location.replace("/login");
+};
 
-
-      return { success: true };
- 
-    } catch (err) {
-      setError(err.message);
-
-      return {
-        success: false,
-        error: err.message,
-      };
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const logout = () => {
-    // Destroy JWT/session token and clear storage
-    localStorage.clear();
-    sessionStorage.clear();
-
-    // Clear authentication cookies
-    document.cookie.split(";").forEach((c) => {
-      document.cookie = c
-        .replace(/^ +/, "")
-        .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
-    });
-
-    // Remove user state
-    setUser(null);
-    setError(null);
-
-    // Redirect immediately to Login
-    window.location.replace("/login");
-  };
-
-  return (
-    <AuthContext.Provider value={{ user, loading, error, login, signup, loginWithGoogle, logout }}>
-
-    <AuthContext.Provider
-      value={{
-        user,
-        loading,
-        error,
-        login,
-        signup,
-        logout,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
-  );
+return (
+  <AuthContext.Provider
+    value={{
+      user,
+      loading,
+      error,
+      login,
+      signup,
+      loginWithGoogle,
+      logout,
+    }}
+  >
+    {children}
+  </AuthContext.Provider>
+);
 }
 
 export function useAuth() {
