@@ -203,7 +203,11 @@ async function syncSQLiteAnswersToMongo(db) {
         userId: row.user_id || "anonymous",
         authorName: row.author_name || row.author || "Community Member",
         votes: row.votes || 0,
-        isBest: Boolean(row.is_best)
+        isBest: Boolean(row.is_best),
+        isVerified: Boolean(row.is_verified),
+        verifiedBy: row.verified_by || null,
+        verifiedAt: row.verified_at ? new Date(row.verified_at) : null,
+        verificationNote: row.verification_note || null
       }));
 
       await db.run(
@@ -561,7 +565,11 @@ async function syncSQLiteToMongo() {
         tags: row.tags ? row.tags.split(",").filter(Boolean) : [],
         searchBoost: row.search_boost || 1,
         userId: row.user_id || "anonymous",
-        authorName: row.author_name || "Anonymous"
+        authorName: row.author_name || "Anonymous",
+        staleScore: row.stale_score || 0,
+        lastReviewedAt: row.last_reviewed_at ? new Date(row.last_reviewed_at) : null,
+        needsUpdate: Boolean(row.needs_update),
+        updateReason: row.update_reason || ""
       }));
 
       await db.run(

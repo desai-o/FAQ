@@ -43,6 +43,27 @@ const faqSchema = new mongoose.Schema(
     authorName: {
       type: String,
       default: "Anonymous"
+    },
+    staleScore: {
+      type: Number,
+      default: 0
+    },
+    lastReviewedAt: {
+      type: Date,
+      default: Date.now
+    },
+    needsUpdate: {
+      type: Boolean,
+      default: false
+    },
+    updateReason: {
+      type: String,
+      default: ""
+    },
+    moderationStatus: {
+      type: String,
+      default: "approved",
+      enum: ["auto_clear", "needs_review", "escalated", "approved", "rejected"]
     }
   },
   {

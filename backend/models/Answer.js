@@ -39,6 +39,27 @@ const answerSchema = new mongoose.Schema(
     isBest: {
       type: Boolean,
       default: false
+    },
+    isVerified: {
+      type: Boolean,
+      default: false
+    },
+    verifiedBy: {
+      type: String,
+      default: null
+    },
+    verifiedAt: {
+      type: Date,
+      default: null
+    },
+    verificationNote: {
+      type: String,
+      default: null
+    },
+    moderationStatus: {
+      type: String,
+      default: "approved",
+      enum: ["auto_clear", "needs_review", "escalated", "approved", "rejected"]
     }
   },
   {

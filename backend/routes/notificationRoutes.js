@@ -300,4 +300,122 @@ router.delete("/:id", requireAuth, writeLimiter, async (req, res) => {
   }
 });
 
+// GET /api/notifications/preferences
+router.get("/preferences", requireAuth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    if (isMongoAvailable()) {
+      const NotificationPreference = require("../models/NotificationPreference");
+      let prefs = await NotificationPreference.findOne({ userId });
+      if (!prefs) {
+        prefs = await NotificationPreference.create({ userId });
+      }
+      return success(res, {
+        storage: "mongodb",
+        data: prefs
+      });
+    }
+
+    const db = getSQLiteDb();
+    let prefs = await db.get("SELECT * FROM notification_preferences WHERE user_id = ?", userId);
+    if (!prefs) {
+      await db.run(
+        `INSERT INTO notification_preferences (user_id, email_notifications, in_app_notifications, digest_frequency, tag_preferences)
+         VALUES (?, 1, 1, 'none', '')`,
+        userId
+      );
+      prefs = await db.get("SELECT * FROM notification_preferences WHERE user_id = ?", userId);
+    }
+
+    return success(res, {
+      storage: "sqlite",
+      data: {
+        userId: prefs.user_id,
+        emailNotifications: !!prefs.email_notifications,
+        inAppNotifications: !!prefs.in_app_notifications,
+        digestFrequency: prefs.digest_frequency,
+        tagPreferences: prefs.tag_preferences ? prefs.tag_preferences.split(",") : []
+      }
+    });
+  } catch (error) {
+    return fail(res, {
+      statusCode: 500,
+      code: "PREFERENCES_FETCH_FAILED",
+      message: "Failed to fetch notification preferences",
+      details: error.message
+    });
+  }
+});
+
+// PUT /api/notifications/preferences
+router.put("/preferences", requireAuth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { emailNotifications, inAppNotifications, digestFrequency, tagPreferences } = req.body;
+
+    if (isMongoAvailable()) {
+      const NotificationPreference = require("../models/NotificationPreference");
+      const prefs = await NotificationPreference.findOneAndUpdate(
+        { userId },
+        {
+          emailNotifications: emailNotifications !== undefined ? !!emailNotifications : true,
+          inAppNotifications: inAppNotifications !== undefined ? !!inAppNotifications : true,
+          digestFrequency: digestFrequency || "none",
+          tagPreferences: Array.isArray(tagPreferences) ? tagPreferences : []
+        },
+        { upsert: true, new: true }
+      );
+
+      return success(res, {
+        storage: "mongodb",
+        data: prefs
+      });
+    }
+
+    const db = getSQLiteDb();
+    const tagPreferencesStr = Array.isArray(tagPreferences) ? tagPreferences.join(",") : "";
+
+    await db.run(
+      `
+      INSERT INTO notification_preferences (
+        user_id, email_notifications, in_app_notifications, digest_frequency, tag_preferences
+      )
+      VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(user_id) DO UPDATE SET
+        email_notifications = excluded.email_notifications,
+        in_app_notifications = excluded.in_app_notifications,
+        digest_frequency = excluded.digest_frequency,
+        tag_preferences = excluded.tag_preferences,
+        updated_at = CURRENT_TIMESTAMP
+      `,
+      userId,
+      emailNotifications !== undefined ? (emailNotifications ? 1 : 0) : 1,
+      inAppNotifications !== undefined ? (inAppNotifications ? 1 : 0) : 1,
+      digestFrequency || "none",
+      tagPreferencesStr
+    );
+
+    const prefs = await db.get("SELECT * FROM notification_preferences WHERE user_id = ?", userId);
+
+    return success(res, {
+      storage: "sqlite",
+      data: {
+        userId: prefs.user_id,
+        emailNotifications: !!prefs.email_notifications,
+        inAppNotifications: !!prefs.in_app_notifications,
+        digestFrequency: prefs.digest_frequency,
+        tagPreferences: prefs.tag_preferences ? prefs.tag_preferences.split(",") : []
+      }
+    });
+  } catch (error) {
+    return fail(res, {
+      statusCode: 500,
+      code: "PREFERENCES_UPDATE_FAILED",
+      message: "Failed to update notification preferences",
+      details: error.message
+    });
+  }
+});
+
 module.exports = router;

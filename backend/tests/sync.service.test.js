@@ -27,6 +27,8 @@ describe("sync service tests", () => {
     if (mongoose.connection.readyState !== 0) {
       await mongoose.disconnect();
     }
+    const { closeSQLite } = require("../db/sqlite");
+    await closeSQLite();
     if (fs.existsSync(testDbPath)) {
       try {
         fs.unlinkSync(testDbPath);

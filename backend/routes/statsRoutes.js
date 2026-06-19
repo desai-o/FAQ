@@ -224,4 +224,83 @@ router.get("/heatmap", async (req, res) => {
   }
 });
 
+const { requireAuth } = require("../middleware/auth");
+const FAQ = require("../models/FAQ");
+const Bookmark = require("../models/Bookmark");
+const Answer = require("../models/Answer");
+
+router.get("/journey", requireAuth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    if (isMongoAvailable()) {
+      const viewEvents = await Event.find({ userId, type: "faq_viewed" }).lean();
+      const viewedFaqIds = Array.from(new Set(viewEvents.map((e) => e.targetId)));
+
+      const bookmarkedCount = await Bookmark.countDocuments({ userId });
+      const answeredCount = await Answer.countDocuments({ userId });
+
+      const viewedFaqs = await FAQ.find({ _id: { $in: viewedFaqIds } }).lean();
+      
+      const topicCoverage = {};
+      viewedFaqs.forEach((faq) => {
+        topicCoverage[faq.category] = (topicCoverage[faq.category] || 0) + 1;
+      });
+
+      return res.json({
+        status: "success",
+        storage: "mongodb",
+        data: {
+          viewedCount: viewedFaqIds.length,
+          bookmarkedCount,
+          answeredCount,
+          topicCoverage
+        }
+      });
+    }
+
+    const db = getSQLiteDb();
+
+    const viewRows = await db.all("SELECT DISTINCT target_id FROM events WHERE user_id = ? AND type = 'faq_viewed'", userId);
+    const viewedFaqIds = viewRows.map((r) => r.target_id);
+
+    const bookmarkRow = await db.get("SELECT COUNT(*) AS total FROM bookmarks WHERE user_id = ?", userId);
+    const bookmarkedCount = bookmarkRow ? bookmarkRow.total : 0;
+
+    const answerRow = await db.get("SELECT COUNT(*) AS total FROM answers WHERE user_id = ?", userId);
+    const answeredCount = answerRow ? answerRow.total : 0;
+
+    const topicCoverage = {};
+    if (viewedFaqIds.length > 0) {
+      const placeholders = viewedFaqIds.map(() => "?").join(",");
+      const viewedFaqs = await db.all(
+        `SELECT category FROM faqs WHERE id IN (${placeholders}) OR mongo_id IN (${placeholders})`,
+        ...viewedFaqIds,
+        ...viewedFaqIds
+      );
+      viewedFaqs.forEach((faq) => {
+        if (faq.category) {
+          topicCoverage[faq.category] = (topicCoverage[faq.category] || 0) + 1;
+        }
+      });
+    }
+
+    return res.json({
+      status: "success",
+      storage: "sqlite",
+      data: {
+        viewedCount: viewedFaqIds.length,
+        bookmarkedCount,
+        answeredCount,
+        topicCoverage
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: "Failed to generate learning journey stats",
+      details: error.message
+    });
+  }
+});
+
 module.exports = router;

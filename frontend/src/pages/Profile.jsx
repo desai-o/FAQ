@@ -12,6 +12,8 @@ import RecentActivity from "../components/profile/RecentActivity";
 import QuickLinks from "../components/profile/QuickLinks";
 import { useAuth } from "../context/AuthContext";
 import { Link } from "react-router-dom";
+import AnalyticsTab from "../components/profile/AnalyticsTab";
+import NotificationPreferences from "../components/profile/NotificationPreferences";
 
 function Profile() {
   const [activeTab, setActiveTab] = useState("Overview");
@@ -92,8 +94,9 @@ function Profile() {
           )}
 
           {activeTab === "Analytics" && <AnalyticsTab />}
+          {activeTab === "Account Settings" && <NotificationPreferences />}
 
-          {activeTab !== "Overview" && activeTab !== "Analytics" && (
+          {activeTab !== "Overview" && activeTab !== "Analytics" && activeTab !== "Account Settings" && (
             <div className="profile-card">
               <h2>{activeTab}</h2>
               <p>Content for {activeTab} will be implemented here.</p>

@@ -29,7 +29,16 @@ const answerRoutes = require("./routes/answerRoutes");
 const voteRoutes = require("./routes/voteRoutes");
 const bookmarkRoutes = require("./routes/bookmarkRoutes");
 const docsRoutes = require("./routes/docsRoutes");
+const contributorRoutes = require("./routes/contributorRoutes");
+const exportRoutes = require("./routes/exportRoutes");
+const recommendationRoutes = require("./routes/recommendationRoutes");
+const learningPathRoutes = require("./routes/learningPathRoutes");
+const duplicateRoutes = require("./routes/duplicateRoutes");
+const chatRoutes = require("./routes/chatRoutes");
+const graphqlRoutes = require("./routes/graphqlRoutes");
+const bountyRoutes = require("./routes/bountyRoutes");
 const { optionalAuth } = require("./middleware/auth");
+
 
 const app = express();
 
@@ -118,7 +127,16 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/docs", docsRoutes);
 app.use("/api/stats", statsRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/contributors", contributorRoutes);
+app.use("/api/export", exportRoutes);
+app.use("/api/recommendations", recommendationRoutes);
+app.use("/api/learning-paths", learningPathRoutes);
+app.use("/api/duplicates", duplicateRoutes);
+app.use("/api/chat", chatRoutes);
+app.use("/api/graphql", graphqlRoutes);
+app.use("/api/bounties", bountyRoutes);
 app.use("/api", aiRoutes);
+
 
 app.use(notFound);
 app.use(errorHandler);

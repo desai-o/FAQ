@@ -11,11 +11,14 @@ const { trackEvent } = require("../services/eventService");
 const { autoFollow } = require("../services/followService");
 const { dispatchNotification } = require("../services/notificationService");
 const { inferCategory, normalizeTags } = require("../services/categoryService");
-const { requireAuth } = require("../middleware/auth");
+const { requireAuth, requireRole } = require("../middleware/auth");
 const { canDeleteResource } = require("../middleware/ownership");
 const { getPagination } = require("../utils/pagination");
 const { success, fail } = require("../utils/apiResponse");
 const { writeLimiter } = require("../middleware/rateLimits");
+const { adjustUserStats } = require("../services/badgeService");
+const { saveQueryRevision } = require("../services/revisionService");
+const { createModerationRecord } = require("../services/moderationService");
 
 const createQuerySchema = z.object({
   body: z.object({
@@ -23,9 +26,22 @@ const createQuerySchema = z.object({
     answer: z.string().max(3000).optional(),
     description: z.string().max(3000).optional(),
     category: z.string().max(100).optional(),
-    tags: z.array(z.string().max(40)).optional()
+    tags: z.array(z.string().trim().min(1).max(40)).min(1).max(10)
   }),
   params: z.object({}).optional(),
+  query: z.object({}).optional()
+});
+
+const updateQuerySchema = z.object({
+  body: z.object({
+    question: z.string().min(3).max(500).optional(),
+    description: z.string().max(3000).optional(),
+    category: z.string().max(100).optional(),
+    tags: z.array(z.string().trim().min(1).max(40)).min(1).max(10).optional()
+  }),
+  params: z.object({
+    id: z.string().min(1)
+  }),
   query: z.object({}).optional()
 });
 
@@ -38,6 +54,7 @@ const resolveQuerySchema = z.object({
   }),
   query: z.object({}).optional()
 });
+
 
 router.post("/", writeLimiter, validate(createQuerySchema), async (req, res) => {
   try {
@@ -84,6 +101,24 @@ router.post("/", writeLimiter, validate(createQuerySchema), async (req, res) => 
         status: answer ? "resolved" : "pending",
         source: "frontend"
       });
+
+      // Run AI moderation check
+      const modResult = await createModerationRecord({
+        targetType: "query",
+        targetId: String(query._id),
+        text: `${question} ${description || ""}`
+      });
+
+      if (modResult.flagged) {
+        query.moderationStatus = "needs_review";
+        await query.save();
+      }
+
+      await adjustUserStats(req.user?.id, { questionsCountDelta: 1, reputationDelta: 2 });
+      if (answer) {
+        await adjustUserStats(req.user?.id, { answersCountDelta: 1, reputationDelta: 5 });
+      }
+
 
       await trackEvent({
         type: answer ? "faq_created" : "question_created",
@@ -151,6 +186,23 @@ router.post("/", writeLimiter, validate(createQuerySchema), async (req, res) => 
       "frontend"
     );
 
+    // Run AI moderation check
+    const modResult = await createModerationRecord({
+      targetType: "query",
+      targetId: String(result.lastID),
+      text: `${question} ${description || ""}`
+    });
+
+    if (modResult.flagged) {
+      await db.run("UPDATE user_queries SET moderation_status = 'needs_review' WHERE id = ?", result.lastID);
+    }
+
+    await adjustUserStats(req.user?.id, { questionsCountDelta: 1, reputationDelta: 2 });
+    if (answer) {
+      await adjustUserStats(req.user?.id, { answersCountDelta: 1, reputationDelta: 5 });
+    }
+
+
     await trackEvent({
       type: answer ? "faq_created" : "question_created",
       userId: req.user?.id || "anonymous",
@@ -188,7 +240,8 @@ router.post("/", writeLimiter, validate(createQuerySchema), async (req, res) => 
         id: result.lastID,
         question: question.trim(),
         answer: answer ? answer.trim() : "",
-        status: answer ? "resolved" : "pending"
+        status: answer ? "resolved" : "pending",
+        moderationStatus: modResult.flagged ? "needs_review" : "approved"
       }
     });
   } catch (error) {
@@ -206,9 +259,10 @@ router.get("/", async (req, res) => {
     const { limit, offset } = getPagination(req.query);
 
     if (isMongoAvailable()) {
+      const filter = { moderationStatus: { $nin: ["needs_review", "rejected"] } };
       const [queries, total] = await Promise.all([
-        UserQuery.find().sort({ createdAt: -1 }).skip(offset).limit(limit),
-        UserQuery.countDocuments()
+        UserQuery.find(filter).sort({ createdAt: -1 }).skip(offset).limit(limit),
+        UserQuery.countDocuments(filter)
       ]);
 
       return success(res, {
@@ -225,6 +279,7 @@ router.get("/", async (req, res) => {
         `
         SELECT *
         FROM user_queries
+        WHERE moderation_status NOT IN ('needs_review', 'rejected')
         ORDER BY created_at DESC
         LIMIT ?
         OFFSET ?
@@ -232,7 +287,7 @@ router.get("/", async (req, res) => {
         limit,
         offset
       ),
-      db.get("SELECT COUNT(*) AS total FROM user_queries")
+      db.get("SELECT COUNT(*) AS total FROM user_queries WHERE moderation_status NOT IN ('needs_review', 'rejected')")
     ]);
 
     return success(res, {
@@ -291,6 +346,9 @@ router.patch("/:id/resolve", writeLimiter, validate(resolveQuerySchema), async (
         });
       }
 
+      await adjustUserStats(req.user?.id, { answersCountDelta: 1, reputationDelta: 5 });
+
+
       enqueueSyncPipeline();
 
       await autoFollow(
@@ -336,6 +394,9 @@ router.patch("/:id/resolve", writeLimiter, validate(resolveQuerySchema), async (
         message: "Query not found"
       });
     }
+
+    await adjustUserStats(req.user?.id, { answersCountDelta: 1, reputationDelta: 5 });
+
 
     enqueueSyncPipeline();
 
@@ -399,6 +460,8 @@ router.delete("/:id", requireAuth, writeLimiter, async (req, res) => {
       }
 
       await UserQuery.deleteOne({ _id: query._id });
+      await adjustUserStats(query.userId, { questionsCountDelta: -1, reputationDelta: -2 });
+
 
       return success(res, {
         storage: "mongodb",
@@ -443,6 +506,9 @@ router.delete("/:id", requireAuth, writeLimiter, async (req, res) => {
       req.params.id
     );
 
+    await adjustUserStats(query.user_id, { questionsCountDelta: -1, reputationDelta: -2 });
+
+
     return success(res, {
       storage: "sqlite",
       data: {
@@ -459,4 +525,103 @@ router.delete("/:id", requireAuth, writeLimiter, async (req, res) => {
   }
 });
 
+// Edit UserQuery
+router.patch("/:id", requireAuth, writeLimiter, validate(updateQuerySchema), async (req, res) => {
+  try {
+    const { question, description, category, tags } = req.body;
+
+    if (isMongoAvailable()) {
+      const query = await UserQuery.findById(req.params.id);
+      if (!query) {
+        return fail(res, { statusCode: 404, code: "QUERY_NOT_FOUND", message: "Query not found" });
+      }
+
+      if (query.userId !== req.user.id && req.user.role !== "admin" && req.user.role !== "moderator") {
+        return fail(res, { statusCode: 403, code: "FORBIDDEN", message: "Not allowed to edit this query" });
+      }
+
+      // Save revision
+      await saveQueryRevision(query._id, {
+        question: query.question,
+        description: query.description,
+        answer: query.answer,
+        category: query.category,
+        tags: query.tags,
+        status: query.status,
+        userId: req.user.id,
+        authorName: req.user.name
+      });
+
+      if (question !== undefined) query.question = question.trim();
+      if (description !== undefined) query.description = description.trim();
+      if (category !== undefined) query.category = category.trim();
+      if (tags !== undefined) query.tags = tags;
+      await query.save();
+
+      return success(res, { storage: "mongodb", data: query });
+    }
+
+    const db = getSQLiteDb();
+    const query = await db.get("SELECT * FROM user_queries WHERE id = ?", req.params.id);
+    if (!query) {
+      return fail(res, { statusCode: 404, code: "QUERY_NOT_FOUND", message: "Query not found" });
+    }
+
+    if (query.user_id !== req.user.id && req.user.role !== "admin" && req.user.role !== "moderator") {
+      return fail(res, { statusCode: 403, code: "FORBIDDEN", message: "Not allowed to edit this query" });
+    }
+
+    // Save revision
+    await saveQueryRevision(query.id, {
+      question: query.question,
+      description: query.description,
+      answer: query.answer,
+      category: query.category,
+      tags: query.tags,
+      status: query.status,
+      userId: req.user.id,
+      authorName: req.user.name
+    });
+
+    const updatedQuestion = question !== undefined ? question.trim() : query.question;
+    const updatedDescription = description !== undefined ? description.trim() : query.description;
+    const updatedCategory = category !== undefined ? category.trim() : query.category;
+    const updatedTags = tags !== undefined ? tags.join(",") : query.tags;
+
+    await db.run(
+      `
+      UPDATE user_queries
+      SET question = ?,
+          description = ?,
+          category = ?,
+          tags = ?,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+      `,
+      updatedQuestion,
+      updatedDescription,
+      updatedCategory,
+      updatedTags,
+      req.params.id
+    );
+
+    const updated = await db.get("SELECT * FROM user_queries WHERE id = ?", req.params.id);
+    return success(res, { storage: "sqlite", data: updated });
+  } catch (error) {
+    return fail(res, { statusCode: 500, code: "QUERY_UPDATE_FAILED", message: error.message });
+  }
+});
+
+// Get query revisions
+router.get("/:id/revisions", async (req, res) => {
+  try {
+    const { getQueryRevisions } = require("../services/revisionService");
+    const revisions = await getQueryRevisions(req.params.id);
+    return success(res, { data: revisions });
+  } catch (error) {
+    return fail(res, { statusCode: 500, code: "GET_REVISIONS_FAILED", message: error.message });
+  }
+});
+
 module.exports = router;
+

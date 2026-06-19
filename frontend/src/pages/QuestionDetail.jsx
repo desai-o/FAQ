@@ -6,7 +6,7 @@ import AskQuestionModal from "../components/AskQuestionModal";
 import Hashtag from "../components/Hashtag";
 import { useFAQ } from "../context/FAQContext";
 import { useAuth } from "../context/AuthContext";
-import { deleteFaq, deleteQuery, deleteAnswer, followResource, unfollowResource, muteFollow, fetchAnswers } from "../api/faqApi";
+import { deleteFaq, deleteQuery, deleteAnswer, followResource, unfollowResource, muteFollow, fetchAnswers, fetchFaqTranslations, createFaqTranslation, createBounty, awardBounty, fetchBounties } from "../api/faqApi";
 import ErrorToast from "../components/ErrorToast";
 
 const defaultQuestion = {
@@ -31,6 +31,13 @@ function QuestionDetail() {
   const [summary, setSummary] = useState("");
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState("");
+  const [translations, setTranslations] = useState([]);
+  const [selectedLanguage, setSelectedLanguage] = useState("original");
+  const [translating, setTranslating] = useState(false);
+  const [activeBounty, setActiveBounty] = useState(null);
+  const [bountyAmount, setBountyAmount] = useState(50);
+  const [showBountyForm, setShowBountyForm] = useState(false);
+  const [bountyLoading, setBountyLoading] = useState(false);
 
   const [followData, setFollowData] = useState({
     isFollowing: false,
@@ -74,9 +81,84 @@ function QuestionDetail() {
     }
   };
 
+  const loadTranslations = async () => {
+    try {
+      const res = await fetchFaqTranslations(id);
+      if (res && res.data) {
+        setTranslations(res.data);
+      }
+    } catch (err) {
+      console.error("Failed to load translations:", err);
+    }
+  };
+
+  const loadBounties = async () => {
+    try {
+      const res = await fetchBounties();
+      if (res && res.data) {
+        const match = res.data.find(b => String(b.queryId || b.query_id) === String(id) && b.status === "open");
+        setActiveBounty(match || null);
+      }
+    } catch (err) {
+      console.error("Failed to load bounties:", err);
+    }
+  };
+
+  const handleCreateBounty = async (e) => {
+    e.preventDefault();
+    setBountyLoading(true);
+    try {
+      await createBounty({
+        queryId: id,
+        amount: Number(bountyAmount),
+        durationDays: 7
+      });
+      setShowBountyForm(false);
+      await loadBounties();
+      setError("");
+    } catch (err) {
+      console.error("Failed to create bounty:", err);
+      setError(err.message || "Failed to create bounty. Note: You need enough reputation points.");
+    } finally {
+      setBountyLoading(false);
+    }
+  };
+
+  const handleAwardBounty = async (answerId) => {
+    if (!activeBounty) return;
+    try {
+      const bountyId = activeBounty.id || activeBounty._id;
+      await awardBounty(bountyId, { answerId });
+      setActiveBounty(null);
+      await loadBounties();
+      loadAnswers(0);
+      setError("");
+      alert("Bounty awarded successfully!");
+    } catch (err) {
+      console.error("Failed to award bounty:", err);
+      setError(err.message || "Failed to award bounty.");
+    }
+  };
+
+  const handleTranslateClick = async (lang) => {
+    setTranslating(true);
+    try {
+      await createFaqTranslation(id, { language: lang });
+      await loadTranslations();
+      setSelectedLanguage(lang);
+    } catch (err) {
+      console.error("Translation error:", err);
+      setError(err.message || "Failed to translate FAQ.");
+    } finally {
+      setTranslating(false);
+    }
+  };
+
   useEffect(() => {
     if (id && id !== "test-id" && id !== "undefined") {
       loadAnswers(0);
+      loadTranslations();
+      loadBounties();
     } else {
       if (question && question.answers) {
         setAnswers(question.answers);
@@ -213,12 +295,146 @@ function QuestionDetail() {
               </div>
 
               <div className="detail-body">
-                <div className="q-tags">
-                  {question.answers && question.answers.length > 0 && <span className="tag answered">✓ Answered</span>}
-                  <span className="tag category">{question.category}</span>
+                <div className="translation-controls" style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px", fontSize: "13px" }}>
+                  <span style={{ color: "var(--text-secondary)" }}>Language:</span>
+                  <select
+                    value={selectedLanguage}
+                    onChange={(e) => setSelectedLanguage(e.target.value)}
+                    style={{
+                      padding: "4px 8px",
+                      borderRadius: "6px",
+                      backgroundColor: "var(--surface-secondary, #2d2d2d)",
+                      color: "var(--text-primary)",
+                      border: "1px solid var(--border)",
+                      outline: "none"
+                    }}
+                  >
+                    <option value="original">Original (English)</option>
+                    <option value="spanish">Spanish</option>
+                    <option value="french">French</option>
+                    <option value="german">German</option>
+                    <option value="chinese">Chinese</option>
+                    <option value="japanese">Japanese</option>
+                    <option value="hindi">Hindi</option>
+                  </select>
+
+                  {selectedLanguage !== "original" && !translations.some(t => t.language.toLowerCase() === selectedLanguage.toLowerCase()) && (
+                    <button
+                      onClick={() => handleTranslateClick(selectedLanguage)}
+                      disabled={translating}
+                      style={{
+                        padding: "4px 10px",
+                        fontSize: "12px",
+                        borderRadius: "6px",
+                        backgroundColor: "#0d9488",
+                        color: "#fff",
+                        border: "none",
+                        cursor: "pointer",
+                        fontWeight: "600"
+                      }}
+                    >
+                      {translating ? "Translating..." : "✨ AI Translate"}
+                    </button>
+                  )}
                 </div>
 
-                <h1 className="detail-title">{question.title}</h1>
+                {activeBounty ? (
+                  <div style={{
+                    margin: "12px 0 16px",
+                    padding: "12px 16px",
+                    borderRadius: "8px",
+                    backgroundColor: "rgba(245, 158, 11, 0.1)",
+                    border: "1px solid rgba(245, 158, 11, 0.3)",
+                    color: "#f59e0b",
+                    fontSize: "13.5px",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center"
+                  }}>
+                    <span>💰 <strong>Active Bounty:</strong> Earn <strong>{activeBounty.amount} reputation points</strong> for answering this question!</span>
+                    <span style={{ fontSize: "11px", opacity: 0.8 }}>
+                      Expires: {new Date(activeBounty.expiresAt).toLocaleDateString()}
+                    </span>
+                  </div>
+                ) : (
+                  user && (
+                    <div style={{ margin: "12px 0 16px" }}>
+                      {!showBountyForm ? (
+                        <button
+                          onClick={() => setShowBountyForm(true)}
+                          style={{
+                            padding: "6px 12px",
+                            fontSize: "12px",
+                            borderRadius: "6px",
+                            backgroundColor: "transparent",
+                            border: "1px dashed var(--border)",
+                            color: "var(--text-secondary)",
+                            cursor: "pointer"
+                          }}
+                        >
+                          + Sponsor Bounty
+                        </button>
+                      ) : (
+                        <form onSubmit={handleCreateBounty} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px", borderRadius: "8px", border: "1px solid var(--border)", backgroundColor: "var(--surface-secondary)" }}>
+                          <span style={{ fontSize: "12.5px" }}>Reputation Points:</span>
+                          <input
+                            type="number"
+                            min="10"
+                            step="10"
+                            value={bountyAmount}
+                            onChange={(e) => setBountyAmount(e.target.value)}
+                            style={{
+                              width: "70px",
+                              padding: "4px 8px",
+                              borderRadius: "4px",
+                              border: "1px solid var(--border)",
+                              backgroundColor: "var(--bg-color)",
+                              color: "var(--text-primary)"
+                            }}
+                            required
+                          />
+                          <button
+                            type="submit"
+                            disabled={bountyLoading}
+                            style={{
+                              padding: "4px 10px",
+                              fontSize: "12px",
+                              borderRadius: "4px",
+                              backgroundColor: "#f59e0b",
+                              color: "#fff",
+                              border: "none",
+                              cursor: "pointer",
+                              fontWeight: "600"
+                            }}
+                          >
+                            {bountyLoading ? "Creating..." : "Post Bounty"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setShowBountyForm(false)}
+                            style={{
+                              padding: "4px 10px",
+                              fontSize: "12px",
+                              borderRadius: "4px",
+                              backgroundColor: "transparent",
+                              color: "var(--text-secondary)",
+                              border: "none",
+                              cursor: "pointer"
+                            }}
+                          >
+                            Cancel
+                          </button>
+                        </form>
+                      )}
+                    </div>
+                  )
+                )}
+
+                <h1 className="detail-title">
+                  {selectedLanguage !== "original" && translations.find(t => t.language.toLowerCase() === selectedLanguage.toLowerCase())
+                    ? translations.find(t => t.language.toLowerCase() === selectedLanguage.toLowerCase()).question
+                    : question.title}
+                </h1>
                 <button
                   onClick={generateSummary}
                   style={{
@@ -252,7 +468,26 @@ function QuestionDetail() {
 
 
 
-                <p className="detail-description">{question.description}</p>
+                {selectedLanguage !== "original" && translations.find(t => t.language.toLowerCase() === selectedLanguage.toLowerCase()) ? (
+                  <div style={{
+                    margin: "16px 0",
+                    padding: "16px",
+                    borderRadius: "12px",
+                    backgroundColor: "rgba(13, 148, 136, 0.08)",
+                    border: "1px solid rgba(13, 148, 136, 0.2)",
+                    boxShadow: "inset 0 1px 2px rgba(0,0,0,0.05)"
+                  }}>
+                    <div style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase", color: "#0d9488", marginBottom: "8px", display: "flex", alignItems: "center", gap: "6px" }}>
+                      <span className="chat-pulse-dot" style={{ display: "inline-block" }}></span>
+                      Translated Content ({translations.find(t => t.language.toLowerCase() === selectedLanguage.toLowerCase()).translationProvenance || "AI"})
+                    </div>
+                    <p style={{ margin: 0, fontSize: "14px", lineHeight: "1.6", color: "var(--text-primary)" }}>
+                      {translations.find(t => t.language.toLowerCase() === selectedLanguage.toLowerCase()).answer}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="detail-description">{question.description}</p>
+                )}
 
                 <div className="detail-hashtags">
                   {question.hashtags.map((tag) => (
@@ -393,6 +628,25 @@ function QuestionDetail() {
                         style={{ marginLeft: "auto" }}
                       >
                         Delete
+                      </button>
+                    )}
+                    {activeBounty && (String(activeBounty.createdBy) === String(user?.id) || user?.role === "admin") && (
+                      <button
+                        onClick={() => handleAwardBounty(answer.id)}
+                        className="bounty-award-btn"
+                        style={{
+                          marginLeft: canDelete(answer) ? "10px" : "auto",
+                          padding: "6px 12px",
+                          borderRadius: "6px",
+                          backgroundColor: "#f59e0b",
+                          color: "#fff",
+                          border: "none",
+                          cursor: "pointer",
+                          fontWeight: "bold",
+                          fontSize: "12px"
+                        }}
+                      >
+                        🏆 Award Bounty ({activeBounty.amount} pts)
                       </button>
                     )}
                   </div>

@@ -48,6 +48,11 @@ const userQuerySchema = new mongoose.Schema(
     promoted: {
       type: Boolean,
       default: false
+    },
+    moderationStatus: {
+      type: String,
+      default: "approved",
+      enum: ["auto_clear", "needs_review", "escalated", "approved", "rejected"]
     }
   },
   {

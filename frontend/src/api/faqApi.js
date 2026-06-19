@@ -181,3 +181,84 @@ export function deleteNotification(notificationId) {
   });
 }
 
+export async function checkDuplicatesApi(question) {
+  return request("/duplicates/check", {
+    method: "POST",
+    body: JSON.stringify({ question })
+  });
+}
+
+export async function sendChatMessage(message, history = []) {
+  return request("/chat", {
+    method: "POST",
+    body: JSON.stringify({ message, history })
+  });
+}
+
+export async function createFaqTranslation(faqId, payload) {
+  return request(`/faqs/${faqId}/translations`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function fetchFaqTranslations(faqId) {
+  return request(`/faqs/${faqId}/translations`);
+}
+
+export async function createBounty(payload) {
+  return request("/bounties", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function awardBounty(bountyId, payload) {
+  return request(`/bounties/${bountyId}/award`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function fetchBounties() {
+  return request("/bounties");
+}
+
+export async function fetchNotificationPreferences() {
+  return request("/notifications/preferences");
+}
+
+export async function updateNotificationPreferences(preferences) {
+  return request("/notifications/preferences", {
+    method: "PUT",
+    body: JSON.stringify(preferences)
+  });
+}
+
+export async function fetchModerationQueue() {
+  return request("/admin/moderation-queue");
+}
+
+export async function fetchModerationExplanation(id) {
+  return request(`/admin/moderation/${id}/explanation`);
+}
+
+export async function actOnModeration(id, payload) {
+  return request(`/admin/moderation/${id}/action`, {
+    method: "PATCH",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function fetchKnowledgeGaps() {
+  return request("/admin/knowledge-gaps");
+}
+
+export async function queryGraphQL(query, variables = {}) {
+  return request("/graphql", {
+    method: "POST",
+    body: JSON.stringify({ query, variables })
+  });
+}
+
+
