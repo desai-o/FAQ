@@ -12,11 +12,18 @@ const userSchema = new mongoose.Schema(
       required: true,
       unique: true,
       lowercase: true,
-      trim: true
+      trim: true,
+      index: true
     },
-    password: {
+    passwordHash: {
       type: String,
       required: true
+    },
+    role: {
+      type: String,
+      enum: ["student", "alumni", "moderator", "admin"],
+      default: "student",
+      index: true
     },
     questionsCount: {
       type: Number,
@@ -44,5 +51,7 @@ const userSchema = new mongoose.Schema(
     timestamps: true
   }
 );
+
+userSchema.index({ reputation: -1 });
 
 module.exports = mongoose.model("User", userSchema);

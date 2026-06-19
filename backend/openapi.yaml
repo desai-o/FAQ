@@ -1,0 +1,113 @@
+openapi: 3.0.3
+info:
+  title: CrowdFAQ API
+  version: 1.0.0
+  description: Backend API for CrowdFAQ with MongoDB primary and SQLite fallback.
+
+servers:
+  - url: http://localhost:5000/api
+
+paths:
+  /faqs:
+    get:
+      summary: List FAQs
+      responses:
+        "200":
+          description: FAQ list returned
+    post:
+      summary: Create FAQ
+      responses:
+        "201":
+          description: FAQ created
+
+  /faqs/{id}:
+    delete:
+      summary: Delete FAQ by owner or admin
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: FAQ deleted
+
+  /queries:
+    get:
+      summary: List user queries
+      responses:
+        "200":
+          description: Query list returned
+    post:
+      summary: Submit user query
+      responses:
+        "201":
+          description: Query submitted
+
+  /queries/{id}/resolve:
+    patch:
+      summary: Resolve pending query
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Query resolved
+
+  /answers:
+    post:
+      summary: Submit answer
+      responses:
+        "201":
+          description: Answer submitted
+
+  /votes:
+    post:
+      summary: Toggle vote
+      responses:
+        "200":
+          description: Vote toggled
+
+  /bookmarks:
+    get:
+      summary: List authenticated user's bookmarks
+      responses:
+        "200":
+          description: Bookmarks returned
+    post:
+      summary: Toggle bookmark
+      responses:
+        "200":
+          description: Bookmark toggled
+
+  /follows:
+    post:
+      summary: Follow question or tag
+      responses:
+        "201":
+          description: Follow created
+
+  /notifications:
+    get:
+      summary: List authenticated user's notifications
+      responses:
+        "200":
+          description: Notifications returned
+
+  /search:
+    post:
+      summary: Search FAQs and user queries
+      responses:
+        "200":
+          description: Search results returned
+
+  /admin/overview:
+    get:
+      summary: Admin overview
+      responses:
+        "200":
+          description: Admin overview returned

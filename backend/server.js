@@ -1,15 +1,19 @@
 require("dotenv").config();
-
 const dns = require("dns");
-dns.setServers(["8.8.8.8", "8.8.4.4"]);
-console.log("Custom DNS applied");
-
+dns.setServers(["8.8.8.8"]);
 const express = require("express");
 const cors = require("cors");
+const helmet = require("helmet");
+const compression = require("compression");
+const rateLimit = require("express-rate-limit");
+const morgan = require("morgan");
+const { notFound, errorHandler } = require("./middleware/errorHandler");
 
+const mongoose = require("mongoose");
 const { connectMongo, isMongoAvailable } = require("./db/mongo");
-const { connectSQLite } = require("./db/sqlite");
-const { startSyncPipeline, runSyncPipeline } = require("./services/syncService");
+const { connectSQLite, getSQLiteDb, closeSQLite } = require("./db/sqlite");
+const { startSyncPipeline, enqueueSyncPipeline } = require("./services/syncService");
+const { getQueueSize } = require("./services/queueService");
 
 const faqRoutes = require("./routes/faqRoutes");
 const queryRoutes = require("./routes/queryRoutes");
@@ -20,6 +24,7 @@ const notificationRoutes = require("./routes/notificationRoutes");
 const statsRoutes = require("./routes/statsRoutes");
 const aiRoutes = require("./routes/aiRoutes");
 const authRoutes = require("./routes/authRoutes");
+const adminRoutes = require("./routes/adminRoutes");
 const answerRoutes = require("./routes/answerRoutes");
 const voteRoutes = require("./routes/voteRoutes");
 const bookmarkRoutes = require("./routes/bookmarkRoutes");
@@ -28,8 +33,32 @@ const adminDocRoutes = require("./routes/adminDocRoutes");
 
 const app = express();
 
-app.use(cors());
-app.use(express.json());
+app.use(helmet());
+app.use(compression());
+app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
+
+app.use(
+  cors({
+    origin: process.env.CORS_ORIGIN || "http://localhost:5173",
+    credentials: true
+  })
+);
+
+app.use(
+  rateLimit({
+    windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS || 900000),
+    max: Number(process.env.RATE_LIMIT_MAX || 300),
+    standardHeaders: true,
+    legacyHeaders: false
+  })
+);
+
+app.use(
+  express.json({
+    limit: "1mb"
+  })
+);
+app.use(optionalAuth);
 
 app.get("/", (req, res) => {
   res.json({
@@ -50,11 +79,30 @@ app.get("/", (req, res) => {
   });
 });
 
-app.get("/health", (req, res) => {
+app.get("/health", async (req, res) => {
+  let sqliteAvailable = false;
+
+  try {
+    const db = getSQLiteDb();
+    await db.get("SELECT 1 AS ok");
+    sqliteAvailable = true;
+  } catch (error) {
+    sqliteAvailable = false;
+  }
+
+  res.json({
+    status: sqliteAvailable ? "ok" : "degraded",
+    mongoAvailable: isMongoAvailable(),
+    sqliteAvailable,
+    fallback: "sqlite",
+    queueSize: getQueueSize()
+  });
+});
+
+app.get("/health/queue", (req, res) => {
   res.json({
     status: "ok",
-    mongoAvailable: isMongoAvailable(),
-    fallback: "sqlite"
+    queueSize: getQueueSize()
   });
 });
 
@@ -64,6 +112,10 @@ app.use("/api/search", searchRoutes);
 app.use("/api/answers", answerRoutes);
 app.use("/api/votes", voteRoutes);
 app.use("/api/bookmarks", bookmarkRoutes);
+app.use("/api/follows", followRoutes);
+app.use("/api/notifications", notificationRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/docs", docsRoutes);
 app.use("/api/stats", statsRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/notifications", notificationRoutes);
@@ -71,18 +123,57 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/admin/documents", adminDocRoutes);
 app.use("/api", aiRoutes);
 
+app.use(notFound);
+app.use(errorHandler);
+
 async function bootstrap() {
   await connectSQLite();
   await connectMongo();
 
-  await runSyncPipeline();
+  enqueueSyncPipeline();
   startSyncPipeline();
 
   const PORT = process.env.PORT || 5000;
 
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
+  });
+
+  async function shutdown(signal) {
+    console.log(`${signal} received. Shutting down gracefully...`);
+
+    server.close(async () => {
+      try {
+        await closeSQLite();
+
+        if (mongoose.connection.readyState !== 0) {
+          await mongoose.connection.close();
+        }
+
+        console.log("Database connections closed");
+        process.exit(0);
+      } catch (error) {
+        console.error("Graceful shutdown failed:", {
+          message: error.message,
+          stack: process.env.NODE_ENV === "production" ? undefined : error.stack
+        });
+        process.exit(1);
+      }
+    });
+  }
+
+  process.once("SIGINT", () => shutdown("SIGINT"));
+  process.once("SIGTERM", () => shutdown("SIGTERM"));
+}
+
+if (process.env.NODE_ENV !== "test") {
+  bootstrap().catch((error) => {
+    console.error("Backend bootstrap failed:", {
+      message: error.message,
+      stack: process.env.NODE_ENV === "production" ? undefined : error.stack
+    });
+    process.exit(1);
   });
 }
 
-bootstrap();
+module.exports = app;

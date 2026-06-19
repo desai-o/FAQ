@@ -1,5 +1,6 @@
 const sqlite3 = require("sqlite3");
 const { open } = require("sqlite");
+const { runMigrations } = require("./migrations/runMigrations");
 
 let sqliteDb = null;
 
@@ -10,6 +11,12 @@ async function connectSQLite() {
   });
 
   await sqliteDb.exec(`
+    PRAGMA foreign_keys = ON;
+    PRAGMA journal_mode = WAL;
+    PRAGMA busy_timeout = 5000;
+  `);
+
+  await sqliteDb.exec(`
     CREATE TABLE IF NOT EXISTS user_queries (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       mongo_id TEXT,
@@ -17,6 +24,11 @@ async function connectSQLite() {
       answer TEXT DEFAULT '',
       status TEXT DEFAULT 'pending',
       source TEXT DEFAULT 'frontend',
+      description TEXT DEFAULT '',
+      category TEXT DEFAULT 'General',
+      tags TEXT DEFAULT '',
+      user_id TEXT DEFAULT 'anonymous',
+      author_name TEXT DEFAULT 'Anonymous',
       promoted INTEGER DEFAULT 0,
       synced_to_mongo INTEGER DEFAULT 0,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
@@ -31,6 +43,11 @@ async function connectSQLite() {
       question TEXT NOT NULL,
       answer TEXT NOT NULL,
       keywords TEXT DEFAULT '',
+      category TEXT DEFAULT 'General',
+      tags TEXT DEFAULT '',
+      search_boost REAL DEFAULT 1,
+      user_id TEXT DEFAULT 'anonymous',
+      author_name TEXT DEFAULT 'Anonymous',
       source_query_id TEXT,
       synced_to_mongo INTEGER DEFAULT 0,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
@@ -161,6 +178,38 @@ await sqliteDb.exec(`
   `);
 
   await sqliteDb.exec(`
+    CREATE TABLE IF NOT EXISTS follows (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      mongo_id TEXT,
+      user_id TEXT DEFAULT 'anonymous',
+      followable_type TEXT NOT NULL,
+      followable_id TEXT NOT NULL,
+      is_muted INTEGER DEFAULT 0,
+      synced_to_mongo INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(user_id, followable_type, followable_id)
+    );
+  `);
+
+  await sqliteDb.exec(`
+    CREATE TABLE IF NOT EXISTS notifications (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      mongo_id TEXT,
+      user_id TEXT NOT NULL,
+      follow_id TEXT,
+      message TEXT NOT NULL,
+      is_read INTEGER DEFAULT 0,
+      event_type TEXT DEFAULT '',
+      followable_type TEXT DEFAULT '',
+      followable_id TEXT DEFAULT '',
+      synced_to_mongo INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  await sqliteDb.exec(`
     CREATE TABLE IF NOT EXISTS events (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       mongo_id TEXT,
@@ -174,6 +223,8 @@ await sqliteDb.exec(`
     );
   `);
 
+  await runMigrations(sqliteDb);
+
   console.log("SQLite fallback ready");
 }
 
@@ -185,7 +236,15 @@ function getSQLiteDb() {
   return sqliteDb;
 }
 
+async function closeSQLite() {
+  if (sqliteDb) {
+    await sqliteDb.close();
+    sqliteDb = null;
+  }
+}
+
 module.exports = {
   connectSQLite,
-  getSQLiteDb
+  getSQLiteDb,
+  closeSQLite
 };

@@ -22,6 +22,16 @@ const answerSchema = new mongoose.Schema(
       default: "Community Member",
       trim: true
     },
+    userId: {
+      type: String,
+      default: "anonymous",
+      index: true
+    },
+    authorName: {
+      type: String,
+      default: "Community Member",
+      trim: true
+    },
     votes: {
       type: Number,
       default: 0

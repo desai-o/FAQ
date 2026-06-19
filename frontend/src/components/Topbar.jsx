@@ -2,9 +2,10 @@ import { useState, useEffect, useRef } from "react";
 import { useFAQ } from "../context/FAQContext";
 import { useTheme } from "../context/ThemeContext";
 import { useNavigate } from "react-router-dom";
-import { apiRequest } from "../api/client";
+
 import ProfileDropdown from "./ProfileDropdown";
 import { useAuth } from "../context/AuthContext";
+import { fetchNotifications, markNotificationsAsRead, markNotificationAsRead } from "../api/faqApi";
 
 const getInitials = (name) => {
   if (!name) return "?";
@@ -67,103 +68,239 @@ function ThemeToggle() {
   );
 }
 
+
+function getNotificationId(notification) {
+  return notification.id || notification._id;
+}
+
+function isNotificationRead(notification) {
+  return Boolean(notification.isRead ?? notification.is_read);
+}
+
+function getNotificationCreatedAt(notification) {
+  return notification.createdAt || notification.created_at;
+}
+
 function Topbar({ openModal }) {
   const { searchQuery, setSearchQuery } = useFAQ();
   const { user } = useAuth();
+  const { theme } = useTheme();
+
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const navigate = useNavigate();
-  
   const [notifications, setNotifications] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [isMarkingNotificationsRead, setIsMarkingNotificationsRead] = useState(false);
+
+  const navigate = useNavigate();
   const dropdownRef = useRef(null);
 
   useEffect(() => {
-    apiRequest("/notifications")
-    .then((data) => {
-      if (data?.data) {
-        setNotifications(data.data);
-      }
-    })
-    .catch((err) =>
-      console.error("Failed to fetch notifications:", err)
-  );
-}, []);
+    if (!user) {
+      setNotifications([]);
+      return;
+    }
 
-  const unreadCount = notifications.filter(n => !n.is_read).length;
-
-  const handleNotifClick = () => {
-    const nextShow = !showDropdown;
-    setShowDropdown(nextShow);
-
-    if (nextShow && unreadCount > 0) {
-      apiRequest("/notifications/read", {
-        method: "PATCH",
+    fetchNotifications()
+      .then((data) => {
+        if (data?.data) {
+          setNotifications(data.data);
+        }
       })
-      .then(() => {
-        setNotifications((prev) =>
-          prev.map((n) => ({ ...n, is_read: true }))
-      );
-    })
-    .catch((err) =>
-      console.error("Failed to mark notifications as read:", err)
-  );
-}
-
-};
+      .catch((err) => {
+        console.error("Failed to fetch notifications:", err);
+      });
+  }, [user]);
 
   useEffect(() => {
-    const handleClickOutside = (event) => {
+    function handleClickOutside(event) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setShowDropdown(false);
       }
-    };
+    }
+
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
   }, []);
 
-  const handleSearch = (e) => {
-    if (e.key === "Enter") {
-      navigate("/questions");
+  const unreadCount = notifications.filter(
+    (notification) => !isNotificationRead(notification)
+  ).length;
+
+  async function handleOpenNotifications() {
+    const nextShow = !showDropdown;
+    setShowDropdown(nextShow);
+
+    if (!nextShow || unreadCount === 0 || !user || isMarkingNotificationsRead) {
+      return;
     }
-  };
+
+    setIsMarkingNotificationsRead(true);
+
+    try {
+      await markNotificationsAsRead();
+
+      setNotifications((prev) =>
+        prev.map((notification) => ({
+          ...notification,
+          isRead: true,
+          is_read: true,
+        }))
+      );
+    } catch (error) {
+      console.error("Failed to mark notifications as read:", error);
+    } finally {
+      setIsMarkingNotificationsRead(false);
+    }
+  }
+
+  async function handleMarkNotificationRead(notificationId) {
+    if (!notificationId) return;
+
+    try {
+      await markNotificationAsRead(notificationId);
+
+      setNotifications((prev) =>
+        prev.map((notification) =>
+          getNotificationId(notification) === notificationId
+            ? {
+                ...notification,
+                isRead: true,
+                is_read: true,
+              }
+            : notification
+        )
+      );
+    } catch (error) {
+      console.error("Failed to mark notification as read:", error);
+    }
+  }
+
+  function handleSearchSubmit(event) {
+    event.preventDefault();
+  }
 
   return (
     <header className="topbar">
-      <div className="search-box">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <form onSubmit={handleSearchSubmit} className="search-box">
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <circle cx="11" cy="11" r="8" />
+          <line x1="21" y1="21" x2="16.65" y2="16.65" />
+        </svg>
+
         <input
           type="text"
           placeholder="Search questions, topics, contributors..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          onKeyDown={handleSearch}
         />
-      </div>
+      </form>
 
       <div className="topbar-actions">
-        <div style={{ position: "relative" }} ref={dropdownRef}>
-          <button className="notif-btn" onClick={handleNotifClick}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-            {unreadCount > 0 && <span className="notif-dot"></span>}
+        <div className="topbar-notifications" ref={dropdownRef}>
+          <button
+            className="notif-btn"
+            onClick={handleOpenNotifications}
+          >
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+            </svg>
+
+            {unreadCount > 0 && <span className="notif-dot" />}
           </button>
-          
+
           {showDropdown && (
-            <div style={{
-              position: "absolute", top: "100%", right: 0, marginTop: "8px", background: "#fff", 
-              border: "1px solid #e5e5e5", borderRadius: "8px", width: "320px", 
-              boxShadow: "0 4px 12px rgba(0,0,0,0.1)", zIndex: 100, display: "flex", flexDirection: "column"
-            }}>
-              <div style={{ padding: "12px 16px", borderBottom: "1px solid #e5e5e5" }}>
-                <h4 style={{ margin: 0, fontSize: "14px", fontWeight: 700, color: "#1a1a1a" }}>Notifications</h4>
+            <div
+              className="notification-dropdown"
+              role="menu"
+              aria-label="Notifications"
+            >
+              <div
+                style={{
+                  padding: "12px 16px",
+                  borderBottom: "1px solid var(--border-color, #e5e7eb)",
+                }}
+              >
+                <h4
+                  style={{
+                    margin: 0,
+                    fontSize: "14px",
+                    fontWeight: 700,
+                  }}
+                >
+                  Notifications
+                </h4>
               </div>
-              <div style={{ maxHeight: "300px", overflowY: "auto" }}>
+
+              <div className="notification-list">
                 {notifications.length === 0 ? (
-                  <p style={{ margin: 0, padding: "20px", textAlign: "center", color: "#999", fontSize: "13px" }}>No notifications yet.</p>
+                  <div className="notification-empty">
+                    No notifications yet
+                  </div>
                 ) : (
-                  notifications.map(n => (
-                    <div key={n.id} style={{ padding: "12px 16px", borderBottom: "1px solid #f0f0f0", display: "flex", flexDirection: "column", gap: "4px" }}>
-                      <p style={{ margin: 0, fontSize: "13px", color: "#1a1a1a", lineHeight: 1.4 }}>{n.message || "Someone interacted with your post."}</p>
-                      <span style={{ fontSize: "11px", color: "#999" }}>{new Date(n.created_at).toLocaleString()}</span>
+                  notifications.map((notification) => (
+                    <div
+                      key={getNotificationId(notification)}
+                      onClick={() =>
+                        handleMarkNotificationRead(
+                          getNotificationId(notification)
+                        )
+                      }
+                      style={{
+                        padding: "12px 16px",
+                        borderBottom: "1px solid var(--border)",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "4px",
+                        cursor: "pointer",
+                        backgroundColor: isNotificationRead(notification)
+                          ? "transparent"
+                          : "var(--surface-secondary)",
+                      }}
+                    >
+                      <p
+                        style={{
+                          margin: 0,
+                          fontSize: "13px",
+                          color: "var(--text-primary)",
+                          lineHeight: 1.4,
+                        }}
+                      >
+                        {notification.message ||
+                          "Someone interacted with your post."}
+                      </p>
+
+                      <span
+                        style={{
+                          fontSize: "11px",
+                          color: "var(--text-secondary)",
+                        }}
+                      >
+                        {new Date(
+                          getNotificationCreatedAt(notification)
+                        ).toLocaleString()}
+                      </span>
                     </div>
                   ))
                 )}
@@ -174,28 +311,30 @@ function Topbar({ openModal }) {
 
         <ThemeToggle />
 
-        <button className="notif-btn">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-          <span className="notif-dot"></span>
-        </button>
-
         <button className="ask-btn" onClick={openModal}>
           + Ask Question
         </button>
 
         {user ? (
           <div style={{ position: "relative" }}>
-            <div 
-              className="avatar" 
-              style={{ cursor: "pointer" }} 
+            <div
+              className="avatar"
+              style={{ cursor: "pointer" }}
               onClick={() => setDropdownOpen(!dropdownOpen)}
             >
               {getInitials(user.name)}
             </div>
-            <ProfileDropdown isOpen={dropdownOpen} onClose={() => setDropdownOpen(false)} />
+
+            <ProfileDropdown
+              isOpen={dropdownOpen}
+              onClose={() => setDropdownOpen(false)}
+            />
           </div>
         ) : (
-          <button className="signin-btn" onClick={() => navigate("/login")}>
+          <button
+            className="signin-btn"
+            onClick={() => navigate("/login")}
+          >
             Sign In
           </button>
         )}
@@ -203,5 +342,4 @@ function Topbar({ openModal }) {
     </header>
   );
 }
-
 export default Topbar;

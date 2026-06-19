@@ -1,5 +1,4 @@
 import { createContext, useContext, useState, useEffect } from "react";
-import { apiRequest } from "../api/client";
 
 const AuthContext = createContext();
 
@@ -12,18 +11,28 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const loadUser = async () => {
       const token = localStorage.getItem("crowdfaq-token");
-
       if (!token) {
         setLoading(false);
         return;
       }
 
       try {
-        const data = await apiRequest("/auth/me");
-        setUser(data.user);
+        const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
+        const response = await fetch(`${apiBaseUrl}/auth/me`, {
+          headers: {
+            "Authorization": `Bearer ${token}`
+          }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setUser(data.user || data.data);
+        } else {
+          // Token expired or invalid
+          localStorage.removeItem("crowdfaq-token");
+          setUser(null);
+        }
       } catch (err) {
-        localStorage.removeItem("crowdfaq-token");
-        setUser(null);
         console.error("Failed to load user profile on boot:", err);
       } finally {
         setLoading(false);
@@ -36,12 +45,21 @@ export function AuthProvider({ children }) {
   const login = async (email, password) => {
     setError(null);
     setLoading(true);
-
     try {
-      const data = await apiRequest("/auth/login", {
+      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
+      const response = await fetch(`${apiBaseUrl}/auth/login`, {
         method: "POST",
-        body: JSON.stringify({ email, password }),
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ email, password })
       });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || data.error || "Login failed");
+      }
 
       localStorage.setItem("crowdfaq-token", data.token);
       setUser(data.user);
@@ -49,11 +67,7 @@ export function AuthProvider({ children }) {
       return { success: true, user: data.user };
     } catch (err) {
       setError(err.message);
-
-      return {
-        success: false,
-        error: err.message,
-      };
+      return { success: false, error: err.message };
     } finally {
       setLoading(false);
     }
@@ -62,12 +76,21 @@ export function AuthProvider({ children }) {
   const signup = async (name, email, password) => {
     setError(null);
     setLoading(true);
-
     try {
-      const data = await apiRequest("/auth/signup", {
+      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
+      const response = await fetch(`${apiBaseUrl}/auth/signup`, {
         method: "POST",
-        body: JSON.stringify({ name, email, password }),
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ name, email, password })
       });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || data.error || "Signup failed");
+      }
 
       localStorage.setItem("crowdfaq-token", data.token);
       setUser(data.user);
@@ -101,11 +124,7 @@ export function AuthProvider({ children }) {
       return { success: true, user: data.user };
     } catch (err) {
       setError(err.message);
-
-      return {
-        success: false,
-        error: err.message,
-      };
+      return { success: false, error: err.message };
     } finally {
       setLoading(false);
     }

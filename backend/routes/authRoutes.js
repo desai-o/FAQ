@@ -6,28 +6,42 @@ const jwt = require("jsonwebtoken");
 const { isMongoAvailable } = require("../db/mongo");
 const { getSQLiteDb } = require("../db/sqlite");
 const User = require("../models/User");
-const authenticateUser = require("../middleware/auth");
+const { requireAuth } = require("../middleware/auth");
+const { success, fail } = require("../utils/apiResponse");
+const { authLimiter } = require("../middleware/rateLimits");
 
 // JWT signature function
 const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET || "crowdfaq_secret_key_12345", {
-    expiresIn: "7d"
+  if (!process.env.JWT_SECRET) {
+    throw new Error("JWT_SECRET is required");
+  }
+
+  return jwt.sign({ id }, process.env.JWT_SECRET, {
+    expiresIn: process.env.JWT_EXPIRES_IN || "7d"
   });
 };
 
 // @route   POST api/auth/signup
 // @desc    Register a user
 // @access  Public
-router.post("/signup", async (req, res) => {
+router.post("/signup", authLimiter, async (req, res) => {
   try {
     const { name, email, password } = req.body;
 
     if (!name || name.trim() === "" || !email || email.trim() === "" || !password || password.trim() === "") {
-      return res.status(400).json({ error: "Please enter all fields" });
+      return fail(res, {
+        statusCode: 400,
+        code: "VALIDATION_ERROR",
+        message: "Please enter all fields"
+      });
     }
 
     if (password.length < 6) {
-      return res.status(400).json({ error: "Password must be at least 6 characters" });
+      return fail(res, {
+        statusCode: 400,
+        code: "VALIDATION_ERROR",
+        message: "Password must be at least 6 characters"
+      });
     }
 
     const normalizedEmail = email.toLowerCase().trim();
@@ -45,7 +59,11 @@ router.post("/signup", async (req, res) => {
     }
 
     if (userExists) {
-      return res.status(400).json({ error: "User already exists with this email" });
+      return fail(res, {
+        statusCode: 400,
+        code: "USER_EXISTS",
+        message: "User already exists with this email"
+      });
     }
 
     // Hash password
@@ -60,7 +78,8 @@ router.post("/signup", async (req, res) => {
       const newUser = await User.create({
         name: name.trim(),
         email: normalizedEmail,
-        password: passwordHash
+        passwordHash,
+        role: "student"
       });
 
       userId = newUser._id.toString();
@@ -112,13 +131,17 @@ router.post("/signup", async (req, res) => {
     // Generate JWT
     const token = generateToken(userId);
 
-    res.status(201).json({
-      token,
-      user: savedUser
+    return success(res, {
+      statusCode: 201,
+      storage: savedUser.storage,
+      data: savedUser,
+      meta: { token, user: savedUser }
     });
   } catch (error) {
-    res.status(500).json({
-      error: "Signup failed",
+    return fail(res, {
+      statusCode: 500,
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Signup failed",
       details: error.message
     });
   }
@@ -127,12 +150,16 @@ router.post("/signup", async (req, res) => {
 // @route   POST api/auth/login
 // @desc    Authenticate user & get token
 // @access  Public
-router.post("/login", async (req, res) => {
+router.post("/login", authLimiter, async (req, res) => {
   try {
     const { email, password } = req.body;
 
     if (!email || email.trim() === "" || !password || password.trim() === "") {
-      return res.status(400).json({ error: "Please enter all fields" });
+      return fail(res, {
+        statusCode: 400,
+        code: "VALIDATION_ERROR",
+        message: "Please enter all fields"
+      });
     }
 
     const normalizedEmail = email.toLowerCase().trim();
@@ -143,7 +170,7 @@ router.post("/login", async (req, res) => {
     if (isMongoAvailable()) {
       user = await User.findOne({ email: normalizedEmail });
       if (user) {
-        isMatch = await bcrypt.compare(password, user.password);
+        isMatch = await bcrypt.compare(password, user.passwordHash);
         if (isMatch) {
           if (user.isSuspended) {
             return res.status(403).json({ error: "Your account is suspended." });
@@ -197,10 +224,16 @@ router.post("/login", async (req, res) => {
       }
     }
 
-    return res.status(400).json({ error: "Invalid credentials" });
+    return fail(res, {
+      statusCode: 400,
+      code: "INVALID_CREDENTIALS",
+      message: "Invalid credentials"
+    });
   } catch (error) {
-    res.status(500).json({
-      error: "Login failed",
+    return fail(res, {
+      statusCode: 500,
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Login failed",
       details: error.message
     });
   }
@@ -353,8 +386,12 @@ router.post("/google", async (req, res) => {
 // @route   GET api/auth/me
 // @desc    Get user data
 // @access  Private
-router.get("/me", authenticateUser, async (req, res) => {
-  res.json({ user: req.user });
+router.get("/me", requireAuth, async (req, res) => {
+  return success(res, {
+    storage: req.user.storage || "mongodb",
+    data: req.user,
+    meta: { user: req.user }
+  });
 });
 
 module.exports = router;

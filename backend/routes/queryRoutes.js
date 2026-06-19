@@ -1,34 +1,74 @@
 const express = require("express");
 const router = express.Router();
+const { z } = require("zod");
+const { validate } = require("../middleware/validate");
 
 const { isMongoAvailable } = require("../db/mongo");
 const { getSQLiteDb } = require("../db/sqlite");
 const UserQuery = require("../models/UserQuery");
-const { runSyncPipeline } = require("../services/syncService");
+const { enqueueSyncPipeline, extractKeywords } = require("../services/syncService");
 const { trackEvent } = require("../services/eventService");
+const { autoFollow } = require("../services/followService");
+const { dispatchNotification } = require("../services/notificationService");
+const { inferCategory, normalizeTags } = require("../services/categoryService");
+const { requireAuth } = require("../middleware/auth");
+const { canDeleteResource } = require("../middleware/ownership");
+const { getPagination } = require("../utils/pagination");
+const { success, fail } = require("../utils/apiResponse");
+const { writeLimiter } = require("../middleware/rateLimits");
 
-router.post("/", async (req, res) => {
-  console.log("POST /queries HIT");
+const createQuerySchema = z.object({
+  body: z.object({
+    question: z.string().min(3).max(500),
+    answer: z.string().max(3000).optional(),
+    description: z.string().max(3000).optional(),
+    category: z.string().max(100).optional(),
+    tags: z.array(z.string().max(40)).optional()
+  }),
+  params: z.object({}).optional(),
+  query: z.object({}).optional()
+});
+
+const resolveQuerySchema = z.object({
+  body: z.object({
+    answer: z.string().min(1).max(3000)
+  }),
+  params: z.object({
+    id: z.string().min(1)
+  }),
+  query: z.object({}).optional()
+});
+
+router.post("/", writeLimiter, validate(createQuerySchema), async (req, res) => {
   try {
-    const { question, answer, description } = req.body;
+    const { question, answer, description, category, tags } = req.body;
 
-    console.log("BODY:", req.body);
+    const inferredCategory =
+      category || inferCategory(`${question || ""} ${description || ""} ${answer || ""}`);
+
+    const normalizedTags = normalizeTags(tags || []);
 
     if (!question || question.trim() === "") {
-      return res.status(400).json({
-        error: "Question is required"
+      return fail(res, {
+        statusCode: 400,
+        code: "VALIDATION_ERROR",
+        message: "Question is required"
       });
     }
 
     if (question.length > 500) {
-      return res.status(400).json({
-        error: "Question must be 500 characters or less"
+      return fail(res, {
+        statusCode: 400,
+        code: "VALIDATION_ERROR",
+        message: "Question must be 500 characters or less"
       });
     }
 
     if (answer && answer.length > 3000) {
-      return res.status(400).json({
-        error: "Answer must be 3000 characters or less"
+      return fail(res, {
+        statusCode: 400,
+        code: "VALIDATION_ERROR",
+        message: "Answer must be 3000 characters or less"
       });
     }
 
@@ -37,14 +77,17 @@ router.post("/", async (req, res) => {
         question: question.trim(),
         description: description ? description.trim() : "",
         answer: answer ? answer.trim() : "",
+        category: inferredCategory,
+        tags: normalizedTags,
+        userId: req.user?.id || "anonymous",
+        authorName: req.user?.name || "Anonymous",
         status: answer ? "resolved" : "pending",
         source: "frontend"
       });
-      console.log("Saved Mongo Query:", query._id);
 
       await trackEvent({
         type: answer ? "faq_created" : "question_created",
-        userId: "anonymous",
+        userId: req.user?.id || "anonymous",
         targetType: "query",
         targetId: String(query._id),
         metadata: {
@@ -53,10 +96,10 @@ router.post("/", async (req, res) => {
         }
       });
 
-      await runSyncPipeline();
+      enqueueSyncPipeline();
 
       await autoFollow(
-        req.body.user_id || req.headers['user-id'],
+        req.user?.id,
         'question',
         query.id || query._id.toString()
       );
@@ -65,14 +108,15 @@ router.post("/", async (req, res) => {
       for (const tag of keywords) {
         await dispatchNotification({
           eventType: 'new_question',
-          triggeredByUserId: req.body.user_id || req.headers['user-id'] || 1,
+          triggeredByUserId: req.user?.id || "anonymous",
           followableType: 'tag',
           followableId: tag,
           message: `New question under #${tag}: ${question.substring(0, 50)}`
         });
       }
 
-      return res.status(201).json({
+      return success(res, {
+        statusCode: 201,
         storage: "mongodb",
         data: query
       });
@@ -85,21 +129,31 @@ router.post("/", async (req, res) => {
       INSERT INTO user_queries (
         question,
         answer,
+        description,
+        category,
+        tags,
+        user_id,
+        author_name,
         status,
         source,
         synced_to_mongo
       )
-      VALUES (?, ?, ?, ?, 0)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
       `,
       question.trim(),
       answer ? answer.trim() : "",
+      description ? description.trim() : "",
+      inferredCategory,
+      normalizedTags.join(","),
+      req.user?.id || "anonymous",
+      req.user?.name || "Anonymous",
       answer ? "resolved" : "pending",
       "frontend"
     );
 
     await trackEvent({
       type: answer ? "faq_created" : "question_created",
-      userId: "anonymous",
+      userId: req.user?.id || "anonymous",
       targetType: "query",
       targetId: String(result.lastID),
       metadata: {
@@ -108,10 +162,10 @@ router.post("/", async (req, res) => {
       }
     });
 
-    await runSyncPipeline();
+    enqueueSyncPipeline();
 
     await autoFollow(
-      req.body.user_id || req.headers['user-id'],
+      req.user?.id,
       'question',
       result.lastID
     );
@@ -120,14 +174,15 @@ router.post("/", async (req, res) => {
     for (const tag of keywords) {
       await dispatchNotification({
         eventType: 'new_question',
-        triggeredByUserId: req.body.user_id || req.headers['user-id'] || 1,
+        triggeredByUserId: req.user?.id || "anonymous",
         followableType: 'tag',
         followableId: tag,
         message: `New question under #${tag}: ${question.substring(0, 50)}`
       });
     }
 
-    return res.status(201).json({
+    return success(res, {
+      statusCode: 201,
       storage: "sqlite",
       data: {
         id: result.lastID,
@@ -137,8 +192,10 @@ router.post("/", async (req, res) => {
       }
     });
   } catch (error) {
-    res.status(500).json({
-      error: "Failed to save query",
+    return fail(res, {
+      statusCode: 500,
+      code: "QUERY_CREATE_FAILED",
+      message: "Failed to save query",
       details: error.message
     });
   }
@@ -146,48 +203,70 @@ router.post("/", async (req, res) => {
 
 router.get("/", async (req, res) => {
   try {
-    if (isMongoAvailable()) {
-      const queries = await UserQuery.find().sort({ createdAt: -1 });
+    const { limit, offset } = getPagination(req.query);
 
-      return res.json({
+    if (isMongoAvailable()) {
+      const [queries, total] = await Promise.all([
+        UserQuery.find().sort({ createdAt: -1 }).skip(offset).limit(limit),
+        UserQuery.countDocuments()
+      ]);
+
+      return success(res, {
         storage: "mongodb",
-        data: queries
+        data: queries,
+        meta: { pagination: { limit, offset, total } }
       });
     }
 
     const db = getSQLiteDb();
 
-    const queries = await db.all(`
-      SELECT *
-      FROM user_queries
-      ORDER BY created_at DESC
-    `);
+    const [queries, totalRow] = await Promise.all([
+      db.all(
+        `
+        SELECT *
+        FROM user_queries
+        ORDER BY created_at DESC
+        LIMIT ?
+        OFFSET ?
+        `,
+        limit,
+        offset
+      ),
+      db.get("SELECT COUNT(*) AS total FROM user_queries")
+    ]);
 
-    return res.json({
+    return success(res, {
       storage: "sqlite",
-      data: queries
+      data: queries,
+      meta: { pagination: { limit, offset, total: totalRow.total } }
     });
   } catch (error) {
-    res.status(500).json({
-      error: "Failed to fetch queries",
+    return fail(res, {
+      statusCode: 500,
+      code: "QUERIES_FETCH_FAILED",
+      message: "Failed to fetch queries",
       details: error.message
     });
   }
 });
 
-router.patch("/:id/resolve", async (req, res) => {
+router.patch("/:id/resolve", writeLimiter, validate(resolveQuerySchema), async (req, res) => {
   try {
     const { answer } = req.body;
 
     if (!answer || answer.trim() === "") {
-      return res.status(400).json({
-        error: "Answer is required to resolve query"
+      return fail(res, {
+        statusCode: 400,
+        code: "VALIDATION_ERROR",
+        message: "Answer is required to resolve query"
       });
     }
 
     if (answer.length > 3000) {
-      return res.status(400).json({
-        error: "Answer must be 3000 characters or less"
+      return fail(res, {
+        statusCode: 400,
+        code: "VALIDATION_ERROR",
+        message: "Answer must be 3000 characters or less"
       });
     }
 
@@ -205,29 +284,31 @@ router.patch("/:id/resolve", async (req, res) => {
       );
 
       if (!query) {
-        return res.status(404).json({
-          error: "Query not found"
+        return fail(res, {
+          statusCode: 404,
+          code: "QUERY_NOT_FOUND",
+          message: "Query not found"
         });
       }
 
-      await runSyncPipeline();
+      enqueueSyncPipeline();
 
       await autoFollow(
-        req.body.user_id || req.headers['user-id'],
+        req.user?.id,
         'question',
         query.id || query._id.toString()
       );
 
-      const username = req.headers['username'] || `User ${req.body.user_id || req.headers['user-id'] || 'Someone'}`;
+      const username = req.user?.name || "Someone";
       await dispatchNotification({
         eventType: 'question_answered',
-        triggeredByUserId: req.body.user_id || req.headers['user-id'] || 1,
+        triggeredByUserId: req.user?.id || "anonymous",
         followableType: 'question',
         followableId: req.params.id,
         message: `${username} answered / commented on: ${query.question.substring(0, 50)}`
       });
 
-      return res.json({
+      return success(res, {
         storage: "mongodb",
         data: query
       });
@@ -249,12 +330,14 @@ router.patch("/:id/resolve", async (req, res) => {
     );
 
     if (result.changes === 0) {
-      return res.status(404).json({
-        error: "Query not found"
+      return fail(res, {
+        statusCode: 404,
+        code: "QUERY_NOT_FOUND",
+        message: "Query not found"
       });
     }
 
-    await runSyncPipeline();
+    enqueueSyncPipeline();
 
     const updated = await db.get(
       `
@@ -266,27 +349,111 @@ router.patch("/:id/resolve", async (req, res) => {
     );
 
     await autoFollow(
-      req.body.user_id || req.headers['user-id'],
+      req.user?.id,
       'question',
       req.params.id
     );
 
-    const username = req.headers['username'] || `User ${req.body.user_id || req.headers['user-id'] || 'Someone'}`;
+    const username = req.user?.name || "Someone";
     await dispatchNotification({
       eventType: 'question_answered',
-      triggeredByUserId: req.body.user_id || req.headers['user-id'] || 1,
+      triggeredByUserId: req.user?.id || "anonymous",
       followableType: 'question',
       followableId: req.params.id,
       message: `${username} answered / commented on: ${updated.question.substring(0, 50)}`
     });
 
-    return res.json({
+    return success(res, {
       storage: "sqlite",
       data: updated
     });
   } catch (error) {
-    res.status(500).json({
-      error: "Failed to resolve query",
+    return fail(res, {
+      statusCode: 500,
+      code: "QUERY_RESOLVE_FAILED",
+      message: "Failed to resolve query",
+      details: error.message
+    });
+  }
+});
+
+router.delete("/:id", requireAuth, writeLimiter, async (req, res) => {
+  try {
+    if (isMongoAvailable()) {
+      const query = await UserQuery.findById(req.params.id);
+
+      if (!query) {
+        return fail(res, {
+          statusCode: 404,
+          code: "QUERY_NOT_FOUND",
+          message: "Query not found"
+        });
+      }
+
+      if (!canDeleteResource(req.user, query)) {
+        return fail(res, {
+          statusCode: 403,
+          code: "FORBIDDEN",
+          message: "You are not allowed to delete this query"
+        });
+      }
+
+      await UserQuery.deleteOne({ _id: query._id });
+
+      return success(res, {
+        storage: "mongodb",
+        data: {
+          deleted: true
+        }
+      });
+    }
+
+    const db = getSQLiteDb();
+
+    const query = await db.get(
+      `
+      SELECT *
+      FROM user_queries
+      WHERE id = ?
+      `,
+      req.params.id
+    );
+
+    if (!query) {
+      return fail(res, {
+        statusCode: 404,
+        code: "QUERY_NOT_FOUND",
+        message: "Query not found"
+      });
+    }
+
+    if (!canDeleteResource(req.user, query)) {
+      return fail(res, {
+        statusCode: 403,
+        code: "FORBIDDEN",
+        message: "You are not allowed to delete this query"
+      });
+    }
+
+    await db.run(
+      `
+      DELETE FROM user_queries
+      WHERE id = ?
+      `,
+      req.params.id
+    );
+
+    return success(res, {
+      storage: "sqlite",
+      data: {
+        deleted: true
+      }
+    });
+  } catch (error) {
+    return fail(res, {
+      statusCode: 500,
+      code: "QUERY_DELETE_FAILED",
+      message: "Failed to delete query",
       details: error.message
     });
   }

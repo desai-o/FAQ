@@ -201,7 +201,7 @@ button, a, input, select, textarea {
 
 html {
   overflow-y: auto;
-  overflow-x: hidden !important;
+  overflow-x: hidden;
 }
 
 body {
@@ -210,8 +210,6 @@ body {
   color: var(--text-primary);
   display: flex;
   min-height: 100vh;
-  overflow: visible;
-  overflow-x: hidden !important;
 }
 
 #root {
@@ -219,7 +217,6 @@ body {
   max-width: 100% !important;
   margin: 0 !important;
   border-inline: none !important;
-  overflow-x: hidden !important;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -422,6 +419,102 @@ input, select, textarea {
   display: flex;
   align-items: center;
   gap: 14px;
+}
+
+.topbar-notifications {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.notification-dropdown {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.75rem);
+  width: min(360px, calc(100vw - 2rem));
+  max-height: 420px;
+  overflow-y: auto;
+  background: var(--card-bg, #ffffff);
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 16px;
+  box-shadow: var(--shadow-lg, 0 20px 40px rgba(15, 23, 42, 0.12));
+  z-index: 1000;
+}
+
+.notification-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.notification-item {
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid var(--border-color, #e5e7eb);
+  background: transparent;
+  color: var(--text-primary, #0f172a);
+  padding: 0.875rem 1rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.notification-item:last-child {
+  border-bottom: 0;
+}
+
+.notification-item:hover,
+.notification-item:focus-visible {
+  background: var(--hover-bg, rgba(15, 23, 42, 0.06));
+  outline: none;
+}
+
+.notification-item.unread {
+  background: var(--accent-soft, rgba(59, 130, 246, 0.08));
+}
+
+.notification-message {
+  display: block;
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+.notification-time {
+  display: block;
+  margin-top: 0.25rem;
+  color: var(--text-muted, #64748b);
+  font-size: 0.75rem;
+}
+
+.notification-empty {
+  padding: 1rem;
+  color: var(--text-muted, #64748b);
+  text-align: center;
+}
+
+[data-theme="dark"] .notification-dropdown {
+  background: var(--card-bg, #111827);
+  border-color: var(--border-color, #374151);
+  box-shadow: var(--shadow-lg, 0 20px 40px rgba(0, 0, 0, 0.35));
+}
+
+[data-theme="dark"] .notification-item {
+  color: var(--text-primary, #f9fafb);
+  border-bottom-color: var(--border-color, #374151);
+}
+
+[data-theme="dark"] .notification-item:hover,
+[data-theme="dark"] .notification-item:focus-visible {
+  background: var(--hover-bg, rgba(255, 255, 255, 0.08));
+}
+
+[data-theme="dark"] .notification-item.unread {
+  background: var(--accent-soft, rgba(59, 130, 246, 0.18));
+}
+
+.topbar button:focus-visible,
+.topbar a:focus-visible,
+.notification-item:focus-visible {
+  outline: 2px solid var(--accent-blue, #3b82f6);
+  outline-offset: 2px;
 }
 
 /* ── THEME TOGGLE BUTTON ── */
@@ -3385,7 +3478,7 @@ input, select, textarea {
   flex-direction: column;
   align-items: center;
   text-align: center;
-  padding: 160px 6% 80px;
+  padding: 140px 6% 24px;
   position: relative;
   z-index: 1;
 }
@@ -3410,7 +3503,7 @@ input, select, textarea {
 .landing-hero-ctas {
   display: flex;
   gap: 16px;
-  margin-bottom: 56px;
+  margin-bottom: 40px;
 }
 
 /* Trust badges */
@@ -3420,8 +3513,8 @@ input, select, textarea {
   justify-content: center;
   flex-wrap: wrap;
   gap: 40px;
-  margin-bottom: 80px;
-  opacity: 0.7;
+  margin-bottom: 32px;
+  opacity: 0.85;
 }
 
 .landing-trust-badge-item {
@@ -3673,7 +3766,7 @@ input, select, textarea {
   font-size: 16px;
   color: var(--text-secondary);
   text-align: center;
-  margin-bottom: 60px;
+  margin: 0 auto 48px;
   max-width: 500px;
 }
 
