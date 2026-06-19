@@ -223,6 +223,7 @@ function Login() {
               </svg>
             </div>
           </button>
+        </div>
 
       {/* Auth Card */}
       <div className="auth-card">
@@ -364,6 +365,7 @@ function Login() {
         </div>
       </div>
     </div>
+  </div>
   );
 }
 

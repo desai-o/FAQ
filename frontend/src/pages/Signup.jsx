@@ -202,8 +202,9 @@ function Signup() {
               </svg>
             </div>
           </button>
+        </div>
 
-      {/* Auth Card */}
+        {/* Auth Card */}
       <div className="auth-card">
         <div className="auth-header">
           <div className="auth-logo">
@@ -394,6 +395,8 @@ function Signup() {
         </div>
       </div>
     </div>
+  </div>
   );
+}
 
 export default Signup;

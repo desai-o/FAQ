@@ -45,12 +45,8 @@ export function AuthProvider({ children }) {
 
       localStorage.setItem("crowdfaq-token", data.token);
       setUser(data.user);
- 
+
       return { success: true, user: data.user };
-
-
-      return { success: true };
-     
     } catch (err) {
       setError(err.message);
 
@@ -75,51 +71,77 @@ export function AuthProvider({ children }) {
 
       localStorage.setItem("crowdfaq-token", data.token);
       setUser(data.user);
- 
+
       return { success: true, user: data.user };
     } catch (err) {
-  setError(err.message);
+      setError(err.message);
 
-  return {
-    success: false,
-    error: err.message,
+      return {
+        success: false,
+        error: err.message,
+      };
+    } finally {
+      setLoading(false);
+    }
   };
-} finally {
-  setLoading(false);
-}
-};
 
-const logout = () => {
-  localStorage.clear();
-  sessionStorage.clear();
+  const loginWithGoogle = async (credential) => {
+    setError(null);
+    setLoading(true);
 
-  document.cookie.split(";").forEach((c) => {
-    document.cookie = c
-      .replace(/^ +/, "")
-      .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
-  });
+    try {
+      const data = await apiRequest("/auth/google", {
+        method: "POST",
+        body: JSON.stringify({ credential }),
+      });
 
-  setUser(null);
-  setError(null);
+      localStorage.setItem("crowdfaq-token", data.token);
+      setUser(data.user);
 
-  window.location.replace("/login");
-};
+      return { success: true, user: data.user };
+    } catch (err) {
+      setError(err.message);
 
-return (
-  <AuthContext.Provider
-    value={{
-      user,
-      loading,
-      error,
-      login,
-      signup,
-      loginWithGoogle,
-      logout,
-    }}
-  >
-    {children}
-  </AuthContext.Provider>
-);
+      return {
+        success: false,
+        error: err.message,
+      };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const logout = () => {
+    localStorage.clear();
+    sessionStorage.clear();
+
+    document.cookie.split(";").forEach((c) => {
+      document.cookie = c
+        .replace(/^ +/, "")
+        .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+    });
+
+    setUser(null);
+    setError(null);
+
+    window.location.replace("/login");
+  };
+
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        error,
+        login,
+        signup,
+        loginWithGoogle,
+        logout,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
 export function useAuth() {
