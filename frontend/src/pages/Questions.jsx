@@ -14,6 +14,67 @@ function Questions() {
   const [activeFilter, setActiveFilter] = useState("All");
   const [selectedCategory, setSelectedCategory] = useState("All Categories");
 
+  // Advanced search states
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [selectedCategories, setSelectedCategories] = useState([]);
+  const [selectedTags, setSelectedTags] = useState([]);
+  const [tagSearch, setTagSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+
+  // Collect unique tags dynamically from current questions
+  const allTags = Array.from(
+    new Set(questions.flatMap((q) => q.hashtags || []))
+  ).filter(Boolean);
+
+  const filteredTags = allTags.filter((tag) =>
+    tag.toLowerCase().includes(tagSearch.toLowerCase())
+  );
+
+  // Sync category dropdown changes
+  const handleCategoryDropdownChange = (val) => {
+    setSelectedCategory(val);
+    if (val === "All Categories") {
+      setSelectedCategories([]);
+    } else {
+      setSelectedCategories([val]);
+    }
+  };
+
+  const handleCategoryChipClick = (cat) => {
+    let next;
+    if (selectedCategories.includes(cat)) {
+      next = selectedCategories.filter((c) => c !== cat);
+    } else {
+      next = [...selectedCategories, cat];
+    }
+    setSelectedCategories(next);
+
+    if (next.length === 1) {
+      setSelectedCategory(next[0]);
+    } else if (next.length === 0) {
+      setSelectedCategory("All Categories");
+    } else {
+      setSelectedCategory("All Categories");
+    }
+  };
+
+  const handleClearAll = () => {
+    setSelectedCategories([]);
+    setSelectedTags([]);
+    setStatusFilter("all");
+    setActiveFilter("All");
+    setSelectedCategory("All Categories");
+    setSearchQuery("");
+    setTagSearch("");
+  };
+
+  const activeFiltersCount =
+    selectedCategories.length +
+    selectedTags.length +
+    (statusFilter !== "all" ? 1 : 0) +
+    (activeFilter !== "All" ? 1 : 0) +
+    (searchQuery.trim() ? 1 : 0);
+
   let filtered = [...questions];
 
   // Apply search query
@@ -27,12 +88,30 @@ function Questions() {
     );
   }
 
-  // Apply category filter
-  if (selectedCategory !== "All Categories") {
+  // Apply category filter (support multiple from advanced search panel)
+  if (selectedCategories.length > 0) {
+    filtered = filtered.filter((q) => selectedCategories.includes(q.category));
+  } else if (selectedCategory !== "All Categories") {
     filtered = filtered.filter((q) => q.category === selectedCategory);
   }
 
-  // Apply active tab filter
+  // Apply tag filter (support multiple tags)
+  if (selectedTags.length > 0) {
+    filtered = filtered.filter((q) =>
+      selectedTags.every((tag) =>
+        q.hashtags.map((t) => t.toLowerCase()).includes(tag.toLowerCase())
+      )
+    );
+  }
+
+  // Apply status filter
+  if (statusFilter === "resolved") {
+    filtered = filtered.filter((q) => q.status === "resolved");
+  } else if (statusFilter === "open") {
+    filtered = filtered.filter((q) => q.status !== "resolved");
+  }
+
+  // Apply active tab filter & sorting
   if (activeFilter === "Unanswered") {
     filtered = filtered.filter((q) => !q.answers || q.answers.length === 0);
   } else if (activeFilter === "Most Voted") {
@@ -64,10 +143,23 @@ function Questions() {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
+            
+            <button
+              type="button"
+              className={`advanced-search-toggle-btn ${showAdvanced ? "active" : ""}`}
+              onClick={() => setShowAdvanced(!showAdvanced)}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+              </svg>
+              <span>Filters</span>
+              {activeFiltersCount > 0 && <span className="active-filter-badge">{activeFiltersCount}</span>}
+            </button>
+
             <select
               className="category-dropdown"
               value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
+              onChange={(e) => handleCategoryDropdownChange(e.target.value)}
             >
               <option>All Categories</option>
               <option>Programming</option>
@@ -78,6 +170,133 @@ function Questions() {
               <option>Mathematics</option>
             </select>
           </div>
+
+          {showAdvanced && (
+            <div className="advanced-filters-panel">
+              <div className="filters-grid">
+                <div className="filter-group">
+                  <h4>Filter by Category</h4>
+                  <div className="category-chips">
+                    {["Programming", "Artificial Intelligence", "Career", "Research", "Scholarships", "Mathematics"].map((cat) => {
+                      const isSelected = selectedCategories.includes(cat);
+                      return (
+                        <button
+                          key={cat}
+                          type="button"
+                          className={`filter-chip ${isSelected ? "active" : ""}`}
+                          onClick={() => handleCategoryChipClick(cat)}
+                        >
+                          {cat}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="filter-group">
+                  <h4>Filter by Tags</h4>
+                  <div className="tag-search-container">
+                    <input
+                      type="text"
+                      placeholder="Search tags..."
+                      value={tagSearch}
+                      onChange={(e) => setTagSearch(e.target.value)}
+                      className="tag-search-input"
+                    />
+                  </div>
+                  <div className="tag-chips">
+                    {filteredTags.slice(0, 15).map((tag) => {
+                      const isSelected = selectedTags.includes(tag);
+                      return (
+                        <button
+                          key={tag}
+                          type="button"
+                          className={`filter-tag ${isSelected ? "active" : ""}`}
+                          onClick={() => {
+                            setSelectedTags((prev) =>
+                              prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+                            );
+                          }}
+                        >
+                          #{tag}
+                        </button>
+                      );
+                    })}
+                    {filteredTags.length === 0 && <span className="no-tags">No tags found</span>}
+                  </div>
+                </div>
+
+                <div className="filter-group">
+                  <h4>Sort & Status</h4>
+                  <div className="filter-row">
+                    <div className="filter-subgroup">
+                      <h5>Sort By</h5>
+                      <div className="btn-group">
+                        <button
+                          type="button"
+                          className={`filter-btn ${activeFilter === "Newest" ? "active" : ""}`}
+                          onClick={() => setActiveFilter("Newest")}
+                        >
+                          🕒 Newest
+                        </button>
+                        <button
+                          type="button"
+                          className={`filter-btn ${activeFilter === "Most Voted" ? "active" : ""}`}
+                          onClick={() => setActiveFilter("Most Voted")}
+                        >
+                          ▲ Most Voted
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="filter-subgroup">
+                      <h5>Status</h5>
+                      <div className="btn-group">
+                        <button
+                          type="button"
+                          className={`filter-btn ${statusFilter === "all" ? "active" : ""}`}
+                          onClick={() => setStatusFilter("all")}
+                        >
+                          All
+                        </button>
+                        <button
+                          type="button"
+                          className={`filter-btn ${statusFilter === "resolved" ? "active" : ""}`}
+                          onClick={() => setStatusFilter("resolved")}
+                        >
+                          Resolved
+                        </button>
+                        <button
+                          type="button"
+                          className={`filter-btn ${statusFilter === "open" ? "active" : ""}`}
+                          onClick={() => setStatusFilter("open")}
+                        >
+                          Open
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="filters-footer">
+                <div className="active-filters-summary">
+                  {activeFiltersCount > 0 ? (
+                    <span>Active filters: {activeFiltersCount} selected</span>
+                  ) : (
+                    <span>No filters applied</span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  className="clear-filters-btn"
+                  onClick={handleClearAll}
+                >
+                  ✕ Clear All Filters
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="filter-tabs">
             <div className="filter-tabs-left">

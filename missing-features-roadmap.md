@@ -671,7 +671,7 @@ Build a complete moderation dashboard UI prototype.
 
 ## 13. Advanced Search UI
 
-Status: Frontend-Only Prototype Pending
+Status: Frontend-Only Prototype Complete
 Scope: Frontend-only
 Priority: High
 
@@ -692,6 +692,17 @@ Improve search controls with filters and sorting.
 
 - User can filter and sort visible results.
 - No backend search changes are introduced.
+
+### Implementation Evidence
+
+- Built the `.advanced-filters-panel` in `frontend/src/pages/Questions.jsx` to show category chips, tag filter search/selection, status sorting (All, Resolved, Open), and sort triggers (Newest, Most Voted).
+- Added comprehensive styles for `.advanced-filters-panel`, chips, tags, and state modifiers inside `frontend/src/styles/style.css`.
+- Synchronized the advanced filter selection back to the category dropdown and filter tabs, updating search results instantaneously client-side.
+
+### Remaining Gaps
+
+- Future database-linked query indexing if full backend integration is approved.
+- Integration tests.
 
 ---
 

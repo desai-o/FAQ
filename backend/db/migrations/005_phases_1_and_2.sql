@@ -7,7 +7,7 @@ ALTER TABLE answers ADD COLUMN verification_note TEXT DEFAULT NULL;
 
 -- Add FAQ relevance decay / needs-update columns
 ALTER TABLE faqs ADD COLUMN stale_score REAL DEFAULT 0;
-ALTER TABLE faqs ADD COLUMN last_reviewed_at TEXT DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE faqs ADD COLUMN last_reviewed_at TEXT DEFAULT NULL;
 ALTER TABLE faqs ADD COLUMN needs_update INTEGER DEFAULT 0;
 ALTER TABLE faqs ADD COLUMN update_reason TEXT DEFAULT '';
 
