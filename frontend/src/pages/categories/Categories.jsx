@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import Sidebar from "../components/Sidebar";
-import Topbar from "../components/Topbar";
-import AskQuestionModal from "../components/AskQuestionModal";
-import { useFAQ } from "../context/FAQContext";
+import Sidebar from "../../shared/components/Sidebar";
+import Topbar from "../../shared/components/Topbar";
+import AskQuestionModal from "../../shared/components/AskQuestionModal";
+import { useFAQ } from "../../shared/context/FAQContext";
 
 function Categories() {
   const [showModal, setShowModal] = useState(false);

@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
-import { useFAQ } from "../context/FAQContext";
-import Hashtag from "./Hashtag";
+import { useFAQ } from "../../../shared/context/FAQContext";
+import Hashtag from "../../../shared/components/Hashtag";
 
 function TrendingQuestions() {
   const { questions, upvoteQuestion } = useFAQ();

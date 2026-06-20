@@ -1,13 +1,13 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useParams } from "react-router-dom";
-import Sidebar from "../components/Sidebar";
-import Topbar from "../components/Topbar";
-import AskQuestionModal from "../components/AskQuestionModal";
-import Hashtag from "../components/Hashtag";
-import { useFAQ } from "../context/FAQContext";
-import { useAuth } from "../context/AuthContext";
-import { deleteFaq, deleteQuery, deleteAnswer, followResource, unfollowResource, muteFollow, fetchAnswers, fetchFaqTranslations, createFaqTranslation, createBounty, awardBounty, fetchBounties } from "../api/faqApi";
-import ErrorToast from "../components/ErrorToast";
+import Sidebar from "../../shared/components/Sidebar";
+import Topbar from "../../shared/components/Topbar";
+import AskQuestionModal from "../../shared/components/AskQuestionModal";
+import Hashtag from "../../shared/components/Hashtag";
+import { useFAQ } from "../../shared/context/FAQContext";
+import { useAuth } from "../../shared/context/AuthContext";
+import { deleteFaq, deleteQuery, deleteAnswer, followResource, unfollowResource, muteFollow, fetchAnswers, fetchFaqTranslations, createFaqTranslation, createBounty, awardBounty, fetchBounties } from "../../shared/api/faqApi";
+import ErrorToast from "../../shared/components/ErrorToast";
 
 const defaultQuestion = {
   title: "Question Not Found",
