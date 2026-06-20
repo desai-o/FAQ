@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { fetchHeatmapStats } from "../api/faqApi";
+import { fetchHeatmapStats } from "../../../shared/api/faqApi";
 import "./CommunityHeatmap.css";
 
 const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];

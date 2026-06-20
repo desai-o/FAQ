@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import Sidebar from "../components/Sidebar";
-import Topbar from "../components/Topbar";
-import AskQuestionModal from "../components/AskQuestionModal";
-import Hashtag from "../components/Hashtag";
-import { useFAQ } from "../context/FAQContext";
+import Sidebar from "../../shared/components/Sidebar";
+import Topbar from "../../shared/components/Topbar";
+import AskQuestionModal from "../../shared/components/AskQuestionModal";
+import Hashtag from "../../shared/components/Hashtag";
+import { useFAQ } from "../../shared/context/FAQContext";
 
 const filters = ["All", "Unanswered", "Most Voted", "Newest"];
 

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useTheme } from "../context/ThemeContext";
-import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../../shared/context/ThemeContext";
+import { useAuth } from "../../shared/context/AuthContext";
 
 function Landing() {
   const { theme, toggleTheme } = useTheme();
@@ -264,18 +264,9 @@ function Landing() {
             <div className="landing-mockup-main">
               <div className="landing-mockup-title">Dashboard Overview</div>
               <div className="landing-mockup-grid">
-                <div className="landing-mockup-card">
-                  <h4>Total Questions</h4>
-                  <p>12,842</p>
-                </div>
-                <div className="landing-mockup-card">
-                  <h4>Answers Posted</h4>
-                  <p>42,109</p>
-                </div>
-                <div className="landing-mockup-card">
-                  <h4>Community Rep</h4>
-                  <p>158,400</p>
-                </div>
+                <div className="landing-mockup-card"><h4>Total Questions</h4><p>12,842</p></div>
+                <div className="landing-mockup-card"><h4>Answers Posted</h4><p>42,109</p></div>
+                <div className="landing-mockup-card"><h4>Community Rep</h4><p>158,400</p></div>
               </div>
               <div style={{ fontSize: "12px", fontWeight: "700", color: "#9ca3af", textTransform: "uppercase" }}>Recent FAQ Threads</div>
               <div className="landing-mockup-list">
@@ -303,141 +294,53 @@ function Landing() {
 
       {/* Stats Strip */}
       <section className="landing-stats-strip scroll-fade-in">
-        <div className="landing-stats-item">
-          <span className="landing-stats-val">12.8K</span>
-          <span className="landing-stats-lbl">Questions Asked</span>
-        </div>
-        <div className="landing-stats-item">
-          <span className="landing-stats-val">3.2K</span>
-          <span className="landing-stats-lbl">Active Members</span>
-        </div>
-        <div className="landing-stats-item">
-          <span className="landing-stats-val">42K</span>
-          <span className="landing-stats-lbl">Answers Posted</span>
-        </div>
+        <div className="landing-stats-item"><span className="landing-stats-val">12.8K</span><span className="landing-stats-lbl">Questions Asked</span></div>
+        <div className="landing-stats-item"><span className="landing-stats-val">3.2K</span><span className="landing-stats-lbl">Active Members</span></div>
+        <div className="landing-stats-item"><span className="landing-stats-val">42K</span><span className="landing-stats-lbl">Answers Posted</span></div>
       </section>
 
       {/* Features */}
       <section id="features" className="landing-features">
         <h2 className="landing-section-title scroll-fade-in">Engineered for Knowledge Sharing</h2>
         <p className="landing-section-subtitle scroll-fade-in">Everything you need to capture, organize, and query community knowledge efficiently.</p>
-
         <div className="landing-features-grid">
-          <div className="landing-feature-card scroll-fade-in">
-            <div className="landing-feature-icon">📝</div>
-            <h3>AI-Powered Summaries</h3>
-            <p>Instantly summarize complex discussion threads into clean key takeaways powered by Gemini</p>
-          </div>
-          <div className="landing-feature-card scroll-fade-in">
-            <div className="landing-feature-icon">🔌</div>
-            <h3>Embeddable Widget</h3>
-            <p>Integrate a floating knowledge helper directly into any website with a single line of code</p>
-          </div>
-          <div className="landing-feature-card scroll-fade-in">
-            <div className="landing-feature-icon">🏆</div>
-            <h3>Contributor Profiles</h3>
-            <p>Track your impact, earn reputation, build your knowledge portfolio</p>
-          </div>
+          <div className="landing-feature-card scroll-fade-in"><div className="landing-feature-icon">📝</div><h3>AI-Powered Summaries</h3><p>Instantly summarize complex discussion threads into clean key takeaways powered by Gemini</p></div>
+          <div className="landing-feature-card scroll-fade-in"><div className="landing-feature-icon">🔌</div><h3>Embeddable Widget</h3><p>Integrate a floating knowledge helper directly into any website with a single line of code</p></div>
+          <div className="landing-feature-card scroll-fade-in"><div className="landing-feature-icon">🏆</div><h3>Contributor Profiles</h3><p>Track your impact, earn reputation, build your knowledge portfolio</p></div>
         </div>
       </section>
 
       <hr className="gradient-divider" />
 
-      {/* Bringing Your Community In - REDESIGNED */}
+      {/* Community Section */}
       <section id="community" className="landing-community-section scroll-fade-in">
         <h2 className="landing-section-title">Bring Your Community In</h2>
-        <p className="landing-section-subtitle">
-          Enable a seamless loop where human experts and deep, structured FAQ assets solve support issues collaboratively.
-        </p>
-
+        <p className="landing-section-subtitle">Enable a seamless loop where human experts and deep, structured FAQ assets solve support issues collaboratively.</p>
         <div className="community-grid">
           <div className="community-content">
             <h3>Humans + AI Hybrid Support</h3>
-            <p style={{ color: "var(--text-secondary)", lineHeight: 1.5, marginBottom: 20, fontSize: "14px" }}>
-              CrowdFAQ unites active community experts with AI capabilities to construct a real-time, automated knowledge base.
-            </p>
-            
-            {/* Visually Redesigned Workflow Steps */}
+            <p style={{ color: "var(--text-secondary)", lineHeight: 1.5, marginBottom: 20, fontSize: "14px" }}>CrowdFAQ unites active community experts with AI capabilities to construct a real-time, automated knowledge base.</p>
             <div className="workflow-steps-list">
-              <div className="community-step">
-                <div className="community-step-number">1</div>
-                <div className="community-step-text">
-                  <h4>Active Human Support</h4>
-                  <p>Experts answer new queries and earn reputation.</p>
-                </div>
-              </div>
-
-              <div className="community-step">
-                <div className="community-step-number">2</div>
-                <div className="community-step-text">
-                  <h4>Detailed FAQ Assets</h4>
-                  <p>AI generates rich tutorials from discussion threads.</p>
-                </div>
-              </div>
-
-              <div className="community-step">
-                <div className="community-step-number">3</div>
-                <div className="community-step-text">
-                  <h4>Continuous Sync</h4>
-                  <p>Solved threads sync instantly across all widgets.</p>
-                </div>
-              </div>
+              <div className="community-step"><div className="community-step-number">1</div><div className="community-step-text"><h4>Active Human Support</h4><p>Experts answer new queries and earn reputation.</p></div></div>
+              <div className="community-step"><div className="community-step-number">2</div><div className="community-step-text"><h4>Detailed FAQ Assets</h4><p>AI generates rich tutorials from discussion threads.</p></div></div>
+              <div className="community-step"><div className="community-step-number">3</div><div className="community-step-text"><h4>Continuous Sync</h4><p>Solved threads sync instantly across all widgets.</p></div></div>
             </div>
           </div>
-
           {/* Interactive Live Simulator */}
           <div className="landing-simulator">
-            <div className="sim-header">
-              <span className="sim-header-title">FAQ Playground & Simulator</span>
-              <span className="sim-status">Online</span>
-            </div>
+            <div className="sim-header"><span className="sim-header-title">FAQ Playground &amp; Simulator</span><span className="sim-status">Online</span></div>
             <div className="sim-body">
-              {messages.map((msg) => (
-                <div key={msg.id} className={`sim-bubble ${msg.sender}`}>
-                  {msg.text}
-                </div>
-              ))}
-              {isTyping && (
-                <div className="sim-bubble ai" style={{ opacity: 0.6 }}>
-                  Gemini is thinking...
-                </div>
-              )}
+              {messages.map((msg) => (<div key={msg.id} className={`sim-bubble ${msg.sender}`}>{msg.text}</div>))}
+              {isTyping && (<div className="sim-bubble ai" style={{ opacity: 0.6 }}>Gemini is thinking...</div>)}
             </div>
             <div className="sim-footer">
-              <input
-                type="text"
-                className="sim-input"
-                placeholder="Ask about widget, human support, etc..."
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
-              />
-              <button className="sim-send-btn" onClick={() => handleSendMessage()}>
-                ➔
-              </button>
+              <input type="text" className="sim-input" placeholder="Ask about widget, human support, etc..." value={inputText} onChange={(e) => setInputText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleSendMessage()} />
+              <button className="sim-send-btn" onClick={() => handleSendMessage()}>➔</button>
             </div>
             <div style={{ display: "flex", gap: 6, padding: "0 16px 12px", background: "var(--bg-white)", flexWrap: "wrap" }}>
-              <button 
-                className="btn" 
-                style={{ fontSize: "10px", padding: "4px 8px", background: "var(--bg-page)", border: "1px solid var(--border)", borderRadius: "4px" }}
-                onClick={() => handleSendMessage("How does integration work?")}
-              >
-                Try "integration"
-              </button>
-              <button 
-                className="btn" 
-                style={{ fontSize: "10px", padding: "4px 8px", background: "var(--bg-page)", border: "1px solid var(--border)", borderRadius: "4px" }}
-                onClick={() => handleSendMessage("Tell me about human support")}
-              >
-                Try "human support"
-              </button>
-              <button 
-                className="btn" 
-                style={{ fontSize: "10px", padding: "4px 8px", background: "var(--bg-page)", border: "1px solid var(--border)", borderRadius: "4px" }}
-                onClick={() => handleSendMessage("What are detailed FAQs?")}
-              >
-                Try "detailed FAQs"
-              </button>
+              <button className="btn" style={{ fontSize: "10px", padding: "4px 8px", background: "var(--bg-page)", border: "1px solid var(--border)", borderRadius: "4px" }} onClick={() => handleSendMessage("How does integration work?")}>Try "integration"</button>
+              <button className="btn" style={{ fontSize: "10px", padding: "4px 8px", background: "var(--bg-page)", border: "1px solid var(--border)", borderRadius: "4px" }} onClick={() => handleSendMessage("Tell me about human support")}>Try "human support"</button>
+              <button className="btn" style={{ fontSize: "10px", padding: "4px 8px", background: "var(--bg-page)", border: "1px solid var(--border)", borderRadius: "4px" }} onClick={() => handleSendMessage("What are detailed FAQs?")}>Try "detailed FAQs"</button>
             </div>
           </div>
         </div>
@@ -445,7 +348,7 @@ function Landing() {
 
       <hr className="gradient-divider" />
 
-      {/* Download Extension Banner */}
+      {/* Extension Banner */}
       <section className="landing-extension-banner scroll-fade-in">
         <div className="landing-extension-banner-container">
           <h2 className="landing-extension-banner-title">⚡ Available as a Browser Extension — Get CrowdFAQ answers anywhere on the web</h2>
@@ -474,16 +377,12 @@ function Landing() {
           </div>
           <div className="landing-code-container">
             <button className="landing-copy-btn" onClick={handleCopyWidget}>Copy</button>
-            <pre>
-              <code>
-{`<!-- CrowdFAQ Floating Widget -->
+            <pre><code>{`<!-- CrowdFAQ Floating Widget -->
 <script 
   src="http://localhost:5173/widget.js" 
   data-site-id="crowdfaq-100" 
   async
-></script>`}
-              </code>
-            </pre>
+></script>`}</code></pre>
           </div>
         </div>
       </section>
@@ -491,10 +390,7 @@ function Landing() {
       {/* Footer */}
       <footer className="landing-footer-dark">
         <div className="landing-footer-dark-row">
-          <div className="logo-container">
-            <div className="logo-badge">Q</div>
-            <span>CrowdFAQ</span>
-          </div>
+          <div className="logo-container"><div className="logo-badge">Q</div><span>CrowdFAQ</span></div>
           <ul className="landing-footer-dark-links">
             <li><a href="#product">Product</a></li>
             <li><a href="#features">Features</a></li>
@@ -502,9 +398,7 @@ function Landing() {
             <li><a href="#privacy">Privacy</a></li>
             <li><a href="#terms">Terms</a></li>
           </ul>
-          <div className="landing-footer-dark-copyright">
-            &copy; 2026 CrowdFAQ Inc. All rights reserved.
-          </div>
+          <div className="landing-footer-dark-copyright">&copy; 2026 CrowdFAQ Inc. All rights reserved.</div>
         </div>
       </footer>
     </div>

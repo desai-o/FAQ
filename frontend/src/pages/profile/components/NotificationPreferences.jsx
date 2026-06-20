@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { fetchNotificationPreferences, updateNotificationPreferences } from "../../api/faqApi";
+import { fetchNotificationPreferences, updateNotificationPreferences } from "../../../shared/api/faqApi";
 
 export default function NotificationPreferences() {
   const [prefs, setPrefs] = useState({

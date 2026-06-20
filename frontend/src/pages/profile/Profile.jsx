@@ -1,19 +1,19 @@
 import { useState } from "react";
-import Sidebar from "../components/Sidebar";
-import Topbar from "../components/Topbar";
-import ProfileHeader from "../components/profile/ProfileHeader";
-import ProfileStats from "../components/profile/ProfileStats";
-import ProfileTabs from "../components/profile/ProfileTabs";
-import RecentContent from "../components/profile/RecentContent";
-import TopFAQ from "../components/profile/TopFAQ";
-import ProfileBadges from "../components/profile/ProfileBadges";
-import Analytics from "../components/profile/Analytics";
-import RecentActivity from "../components/profile/RecentActivity";
-import QuickLinks from "../components/profile/QuickLinks";
-import { useAuth } from "../context/AuthContext";
+import Sidebar from "../../shared/components/Sidebar";
+import Topbar from "../../shared/components/Topbar";
+import ProfileHeader from "./components/ProfileHeader";
+import ProfileStats from "./components/ProfileStats";
+import ProfileTabs from "./components/ProfileTabs";
+import RecentContent from "./components/RecentContent";
+import TopFAQ from "./components/TopFAQ";
+import ProfileBadges from "./components/ProfileBadges";
+import Analytics from "./components/Analytics";
+import RecentActivity from "./components/RecentActivity";
+import QuickLinks from "./components/QuickLinks";
+import { useAuth } from "../../shared/context/AuthContext";
 import { Link } from "react-router-dom";
-import AnalyticsTab from "../components/profile/AnalyticsTab";
-import NotificationPreferences from "../components/profile/NotificationPreferences";
+import AnalyticsTab from "./components/AnalyticsTab";
+import NotificationPreferences from "./components/NotificationPreferences";
 
 function Profile() {
   const [activeTab, setActiveTab] = useState("Overview");

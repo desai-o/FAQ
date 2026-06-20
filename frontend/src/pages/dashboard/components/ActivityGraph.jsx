@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { fetchActivityStats } from "../api/faqApi";
-import { useTheme } from "../context/ThemeContext";
+import { fetchActivityStats } from "../../../shared/api/faqApi";
+import { useTheme } from "../../../shared/context/ThemeContext";
 import { Line } from "react-chartjs-2";
 import {
   Chart as ChartJS,

@@ -9,10 +9,10 @@ import {
   previewFaqImport,
   confirmFaqImport,
   downloadFaqExport
-} from "../api/faqApi";
-import Sidebar from "../components/Sidebar";
-import Topbar from "../components/Topbar";
-import AskQuestionModal from "../components/AskQuestionModal";
+} from "../../shared/api/faqApi";
+import Sidebar from "../../shared/components/Sidebar";
+import Topbar from "../../shared/components/Topbar";
+import AskQuestionModal from "../../shared/components/AskQuestionModal";
 
 export default function Admin() {
   const [activeTab, setActiveTab] = useState("Overview");

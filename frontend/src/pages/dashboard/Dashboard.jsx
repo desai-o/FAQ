@@ -1,12 +1,12 @@
 import { useState } from "react";
-import TrendingQuestions from "../components/TrendingQuestions";
-import StatsGrid from "../components/StatsGrid";
-import CommunityHeatmap from "../components/CommunityHeatmap";
-import ActivityGraph from "../components/ActivityGraph";
-import Sidebar from "../components/Sidebar";
-import Topbar from "../components/Topbar";
-import AskQuestionModal from "../components/AskQuestionModal";
-import { useFAQ } from "../context/FAQContext";
+import TrendingQuestions from "./components/TrendingQuestions";
+import StatsGrid from "./components/StatsGrid";
+import CommunityHeatmap from "./components/CommunityHeatmap";
+import ActivityGraph from "./components/ActivityGraph";
+import Sidebar from "../../shared/components/Sidebar";
+import Topbar from "../../shared/components/Topbar";
+import AskQuestionModal from "../../shared/components/AskQuestionModal";
+import { useFAQ } from "../../shared/context/FAQContext";
 
 function Dashboard() {
   const [showModal, setShowModal] = useState(false);

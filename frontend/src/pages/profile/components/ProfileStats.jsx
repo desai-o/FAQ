@@ -2,8 +2,8 @@ import {
   MessagePlusIcon, PencilIcon, SendIcon,
   MessageCircleIcon, EyeIcon, ThumbsUpIcon
 } from "./ProfileIcons";
-import { useFAQ } from "../../context/FAQContext";
-import { useAuth } from "../../context/AuthContext";
+import { useFAQ } from "../../../shared/context/FAQContext";
+import { useAuth } from "../../../shared/context/AuthContext";
 
 function ProfileStats() {
   const { contributors } = useFAQ();

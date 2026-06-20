@@ -1,5 +1,5 @@
 import { PencilIcon, UsersIcon, MapPinIcon, MailIcon } from "./ProfileIcons";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../../../shared/context/AuthContext";
 
 const getInitials = (name) => {
   if (!name) return "?";
