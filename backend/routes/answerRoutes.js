@@ -223,25 +223,26 @@ router.post("/", requireAuth, writeLimiter, validate(createAnswerSchema), async 
     const db = getSQLiteDb();
 
     const result = await db.run(
-      `
-      INSERT INTO answers (
+        `
+        INSERT INTO answers (
         question_id,
         query_id,
         content,
         author,
         user_id,
         author_name,
-        synced_to_mongo
-      )
-      VALUES (?, ?, ?, ?, ?, ?, 0)
-      `,
-      questionId || null,
-      queryId || null,
-      content.trim(),
-      actorName,
-      actorId,
-      actorName
-    );
+        synced_to_mongo,
+        moderation_status
+        )
+        VALUES (?, ?, ?, ?, ?, ?, 0, 'approved')
+        `,
+        questionId || null,
+        queryId || null,
+        content.trim(),
+        actorName,
+        actorId,
+        actorName
+      );
 
     // Run AI moderation check
     const modResult = await createModerationRecord({
@@ -334,16 +335,21 @@ router.get("/query/:queryId", async (req, res) => {
         `
         SELECT *
         FROM answers
-        WHERE query_id = ? AND moderation_status NOT IN ('needs_review', 'rejected')
+        WHERE (question_id = ? OR query_id = ?) AND moderation_status NOT IN ('needs_review', 'rejected')
         ORDER BY created_at DESC
         LIMIT ?
         OFFSET ?
         `,
-        queryId,
+        questionId,
+        questionId,
         limit,
         offset
       ),
-      db.get("SELECT COUNT(*) AS total FROM answers WHERE query_id = ? AND moderation_status NOT IN ('needs_review', 'rejected')", queryId)
+      db.get(
+        "SELECT COUNT(*) AS total FROM answers WHERE (question_id = ? OR query_id = ?) AND moderation_status NOT IN ('needs_review', 'rejected')",
+        questionId,
+        questionId
+      )
     ]);
 
     await trackEvent({
@@ -375,7 +381,10 @@ router.get("/:questionId", async (req, res) => {
     const { limit, offset } = getPagination(req.query);
 
     if (isMongoAvailable()) {
-      const filter = { questionId, moderationStatus: { $nin: ["needs_review", "rejected"] } };
+      const filter = {
+        $or: [{ questionId }, { queryId: questionId }],
+        moderationStatus: { $nin: ["needs_review", "rejected"] }
+      };
       const [answers, total] = await Promise.all([
         Answer.find(filter).sort({ createdAt: -1 }).skip(offset).limit(limit),
         Answer.countDocuments(filter)

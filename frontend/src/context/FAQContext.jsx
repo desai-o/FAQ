@@ -508,6 +508,21 @@ export function FAQProvider({ children }) {
     }
   }
 
+  // Persist answers for a specific question into the questions cache
+  const setQuestionAnswers = (questionId, answersArray) => {
+    try {
+      setQuestions((prev) =>
+        prev.map((q) =>
+          String(q.id) === String(questionId)
+            ? { ...q, answers: Array.isArray(answersArray) ? answersArray : [] }
+            : q
+        )
+      );
+    } catch (err) {
+      console.error("Failed to set question answers in context:", err);
+    }
+  };
+
   const addQuestion = async (title, category, description, hashtagsString) => {
     requireLoggedInAction("ask a question");
 
@@ -648,19 +663,26 @@ export function FAQProvider({ children }) {
       throw err;
     }
   };
-  const addAnswer = async (questionId, content) => {
+  const addAnswer = async (questionId, content, sourceType = "faq") => {
     requireLoggedInAction("submit an answer");
     const cleanContent = content.trim();
     if (!cleanContent) return null;
 
     const author = user?.name || "Community Member";
 
+    const submitPayload = {
+      content: cleanContent,
+      author
+    };
+
+    if (sourceType === "query") {
+      submitPayload.queryId = questionId;
+    } else {
+      submitPayload.questionId = questionId;
+    }
+
     try {
-      const response = await submitAnswer({
-        questionId,
-        content: cleanContent,
-        author
-      });
+      const response = await submitAnswer(submitPayload);
 
       const savedAnswer = response.data;
 
@@ -788,6 +810,7 @@ export function FAQProvider({ children }) {
         upvoteQuestion,
         bookmarkQuestion,
         addAnswer,
+        setQuestionAnswers,
         upvoteAnswer,
         backendOnline,
         loadingQuestions,

@@ -1,6 +1,7 @@
 require("dotenv").config();
+// Fix DNS SRV lookup issues (MongoDB Atlas connection fix)
 const dns = require("dns");
-dns.setServers(["8.8.8.8"]);
+dns.setServers(["8.8.8.8", "8.8.4.4"]);
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
