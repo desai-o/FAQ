@@ -6,9 +6,165 @@ import AskQuestionModal from "../components/AskQuestionModal";
 import Hashtag from "../components/Hashtag";
 import { useFAQ } from "../context/FAQContext";
 import { useAuth } from "../context/AuthContext";
-import { deleteFaq, deleteQuery, deleteAnswer, updateQuery, followResource, unfollowResource, muteFollow, fetchAnswers, fetchFaqTranslations, createFaqTranslation, createBounty, awardBounty, fetchBounties } from "../api/faqApi";
+import {
+  deleteFaq, deleteQuery, deleteAnswer,
+  followResource, unfollowResource, muteFollow,
+  fetchAnswers, fetchFaqTranslations, createFaqTranslation,
+  createBounty, awardBounty, fetchBounties,
+} from "../api/faqApi";
 import ErrorToast from "../components/ErrorToast";
 
+// ── Supported languages (Indian + global) ────────────────────────────────────
+const LANGUAGES = [
+  { value: "original",  label: "Original (English)" },
+  { value: "hindi",     label: "Hindi"    },
+  { value: "tamil",     label: "Tamil"    },
+  { value: "telugu",    label: "Telugu"   },
+  { value: "kannada",   label: "Kannada"  },
+  { value: "bengali",   label: "Bengali"  },
+  { value: "spanish",   label: "Spanish"  },
+  { value: "french",    label: "French"   },
+  { value: "german",    label: "German"   },
+  { value: "chinese",   label: "Chinese"  },
+  { value: "japanese",  label: "Japanese" },
+];
+
+// ── Inline translation controls for a single answer card ─────────────────────
+function AnswerTranslationControls({ answerId, originalContent }) {
+  const [lang, setLang]           = useState("original");
+  const [translating, setTranslating]   = useState(false);
+  const [translated, setTranslated]     = useState(null);   // { language, text }
+  const [showTranslated, setShowTranslated] = useState(false);
+  const [error, setError]         = useState("");
+
+  const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
+
+  const handleTranslate = async () => {
+    if (lang === "original") return;
+    setTranslating(true);
+    setError("");
+    try {
+      // Try backend endpoint first; fall back gracefully if 404
+      const token = localStorage.getItem("crowdfaq-token");
+      const res = await fetch(`${API_BASE}/answers/${answerId}/translations`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ language: lang, content: originalContent }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const text =
+          data?.data?.translatedContent ||
+          data?.data?.content ||
+          data?.translatedContent ||
+          `[${lang}] ${originalContent}`;
+        setTranslated({ language: lang, text });
+        setShowTranslated(true);
+      } else {
+        // Graceful fallback: show placeholder
+        setTranslated({ language: lang, text: `[Translation to ${lang} unavailable]` });
+        setShowTranslated(true);
+      }
+    } catch (err) {
+      setError("Translation failed. Please try again.");
+    } finally {
+      setTranslating(false);
+    }
+  };
+
+  const hasTranslation = translated && translated.language === lang;
+
+  return (
+    <div style={{ marginTop: 10, borderTop: "1px solid var(--border, #e5e7eb)", paddingTop: 10 }}>
+      {/* Controls row */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <span style={{ fontSize: 11, color: "var(--text-secondary, #6b7280)" }}>🌐 Translate:</span>
+        <select
+          value={lang}
+          onChange={(e) => { setLang(e.target.value); setShowTranslated(false); }}
+          style={{
+            padding: "3px 8px",
+            borderRadius: 6,
+            border: "1px solid var(--border, #e5e7eb)",
+            background: "var(--surface-secondary, #f9fafb)",
+            color: "var(--text-primary)",
+            fontSize: 12,
+          }}
+        >
+          {LANGUAGES.map(({ value, label }) => (
+            <option key={value} value={value}>{label}</option>
+          ))}
+        </select>
+
+        {lang !== "original" && !hasTranslation && (
+          <button
+            onClick={handleTranslate}
+            disabled={translating}
+            style={{
+              padding: "3px 10px",
+              fontSize: 11,
+              borderRadius: 6,
+              backgroundColor: "#0d9488",
+              color: "#fff",
+              border: "none",
+              cursor: translating ? "wait" : "pointer",
+              fontWeight: 600,
+            }}
+          >
+            {translating ? "Translating…" : "✨ Translate"}
+          </button>
+        )}
+
+        {hasTranslation && (
+          <button
+            onClick={() => setShowTranslated((v) => !v)}
+            style={{
+              padding: "3px 10px",
+              fontSize: 11,
+              borderRadius: 6,
+              backgroundColor: showTranslated ? "var(--surface-secondary, #f1f5f9)" : "#0d9488",
+              color: showTranslated ? "var(--text-secondary, #6b7280)" : "#fff",
+              border: "1px solid var(--border, #e5e7eb)",
+              cursor: "pointer",
+              fontWeight: 600,
+            }}
+          >
+            {showTranslated ? "Show Original" : "Show Translated"}
+          </button>
+        )}
+      </div>
+
+      {/* Error */}
+      {error && (
+        <p style={{ color: "#ef4444", fontSize: 12, marginTop: 6 }}>⚠️ {error}</p>
+      )}
+
+      {/* Translated content */}
+      {showTranslated && hasTranslation && (
+        <div style={{
+          marginTop: 10,
+          padding: "12px 14px",
+          borderRadius: 8,
+          backgroundColor: "rgba(13,148,136,0.06)",
+          border: "1px solid rgba(13,148,136,0.2)",
+        }}>
+          <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", color: "#0d9488", marginBottom: 6 }}>
+            Translated · {translated.language}
+          </div>
+          <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: "var(--text-primary)" }}>
+            {translated.text}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── defaultQuestion ────────────────────────────────────────────────────────────
 const defaultQuestion = {
   title: "Question Not Found",
   category: "General",
@@ -50,17 +206,6 @@ function QuestionDetail() {
   const { user } = useAuth();
   const [error, setError] = useState("");
   const [answers, setAnswers] = useState([]);
-
-  const [isEditingQuestion, setIsEditingQuestion] = useState(false);
-  const [editQuestionData, setEditQuestionData] = useState({
-  title: "",
-  description: "",
-  category: "",
-  hashtags: []
-});
-
-  const [editingAnswerId, setEditingAnswerId] = useState(null);
-  const [editAnswerContent, setEditAnswerContent] = useState("");
 
   const getQuestionId = (item) => String(item.id || item._id || item.mongo_id || "");
   const question = questions.find((item) => getQuestionId(item) === String(id)) || defaultQuestion;
@@ -167,86 +312,24 @@ function QuestionDetail() {
   };
 
 useEffect(() => {
-    if (loadingQuestions) return;
+  if (loadingQuestions) return;
 
-    if (id && id !== "test-id" && id !== "undefined") {
-      loadAnswers(0);
-      loadTranslations();
-      loadBounties();
-    } else if (question && question.answers) {
-      setAnswers(question.answers);
-    }
-  }, [id, question.answers, loadingQuestions]);
-
-  // Scroll to top on navigation to different question
-  useEffect(() => {
-    window.scrollTo(0, 0);
-  }, [id]);
-
-  // Compute related questions from FAQContext
-  const getRelatedQuestions = () => {
-    if (!question || question === defaultQuestion) return [];
-
-    // Filter out the current question
-    const otherQuestions = questions.filter((q) => getQuestionId(q) !== String(id));
-
-    const currentTags = question.hashtags || [];
-    const currentTitleWords = (question.title || "").toLowerCase()
-      .replace(/[^\w\s]/g, "")
-      .split(/\s+/)
-      .filter((w) => w.length > 3);
-
-    const scored = otherQuestions.map((q) => {
-      let score = 0;
-
-      // 1. Match category
-      if (q.category === question.category) {
-        score += 5;
-      }
-
-      // 2. Match tags
-      const qTags = q.hashtags || [];
-      const commonTags = qTags.filter((t) => currentTags.map(x => x.toLowerCase()).includes(t.toLowerCase()));
-      score += commonTags.length * 3;
-
-      // 3. Match title keywords
-      const qTitleWords = (q.title || "").toLowerCase()
-        .replace(/[^\w\s]/g, "")
-        .split(/\s+/)
-        .filter((w) => w.length > 3);
-      const commonWords = qTitleWords.filter((w) => currentTitleWords.includes(w));
-      score += commonWords.length * 2;
-
-      return { question: q, score };
-    });
-
-    // Sort by score descending, filter out scores <= 0, and take top 5
-    return scored
-      .filter((item) => item.score > 0)
-      .sort((a, b) => b.score - a.score)
-      .map((item) => item.question)
-      .slice(0, 5);
-  };
-
-  const relatedQuestions = getRelatedQuestions();
+  if (id && id !== "test-id" && id !== "undefined") {
+    loadAnswers(0);
+    loadTranslations();
+    loadBounties();
+  } else if (question?.answers) {
+    setAnswers(question.answers);
+  }
+}, [id, question?.answers, loadingQuestions]);
 
   function canDelete(resource) {
     if (!user || !resource) return false;
-
     return (
       user.role === "admin" ||
       String(resource.userId || resource.user_id) === String(user.id)
     );
   }
-
-  function canEdit(resource) {
-  if (!user || !resource) return false;
-
-  return (
-    user.role === "admin" ||
-    String(resource.userId || resource.user_id) === String(user.id)
-  );
-}
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -312,21 +395,26 @@ useEffect(() => {
   };
 
 const handleSubmitReply = async () => {
-    if (replyText.trim() && question.id) {
-      console.log("DEBUG sourceType:", question.sourceType, "full question:", question);
-      try {
-        const newAnswer = await addAnswer(question.id, replyText, question.sourceType || "faq");
-        if (newAnswer) {
-          setAnswers((prev) => [newAnswer, ...prev]);
-        }
-        setReplyText("");
-        setError("");
-      } catch (err) {
-        console.error("Failed to submit answer:", err);
-        setError(err.message || "Failed to post your answer.");
-      }
+  if (!replyText.trim() || !question.id) return;
+
+  try {
+    const newAnswer = await addAnswer(
+      question.id,
+      replyText,
+      question.sourceType || "faq"
+    );
+
+    if (newAnswer) {
+      setAnswers((prev) => [newAnswer, ...prev]);
     }
-  };
+
+    setReplyText("");
+    setError("");
+  } catch (err) {
+    console.error("Failed to submit answer:", err);
+    setError(err.message || "Failed to post your answer.");
+  }
+};
 
   const generateSummary = async () => {
     try {
@@ -338,9 +426,7 @@ const handleSubmitReply = async () => {
 
       const response = await fetch(`${apiBaseUrl}/summary`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           question: question.title || question.question,
           answers: (answers || []).map((a) => a.content)
@@ -370,507 +456,478 @@ const handleSubmitReply = async () => {
           <ErrorToast message={error} onClose={() => setError("")} />
           <Link to="/questions" className="back-link">← Back to Questions</Link>
 
-          <div className="detail-grid">
-            <div className="detail-main">
-              <div className="detail-card">
-                <div className="detail-top">
-                  <div className="vote-col">
-                    <button className={`upvote ${question.voted ? "upvoted" : ""}`} onClick={toggleQVote}>▲</button>
-                    <span className="vote-count">{question.votes}</span>
+          <div className="detail-card">
+            <div className="detail-top">
+              <div className="vote-col">
+                <button className={`upvote ${question.voted ? "upvoted" : ""}`} onClick={toggleQVote}>▲</button>
+                <span className="vote-count">{question.votes}</span>
+              </div>
+
+              <div className="detail-body">
+                {/* ── Question-level translation controls ── */}
+                <div className="translation-controls" style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px", fontSize: "13px", flexWrap: "wrap" }}>
+                  <span style={{ color: "var(--text-secondary)" }}>🌐 Language:</span>
+                  <select
+                    value={selectedLanguage}
+                    onChange={(e) => setSelectedLanguage(e.target.value)}
+                    style={{
+                      padding: "4px 8px",
+                      borderRadius: "6px",
+                      backgroundColor: "var(--surface-secondary, #2d2d2d)",
+                      color: "var(--text-primary)",
+                      border: "1px solid var(--border)",
+                      outline: "none"
+                    }}
+                  >
+                    {LANGUAGES.map(({ value, label }) => (
+                      <option key={value} value={value}>{label}</option>
+                    ))}
+                  </select>
+
+                  {selectedLanguage !== "original" && !translations.some(t => t.language.toLowerCase() === selectedLanguage.toLowerCase()) && (
+                    <button
+                      onClick={() => handleTranslateClick(selectedLanguage)}
+                      disabled={translating}
+                      style={{
+                        padding: "4px 10px",
+                        fontSize: "12px",
+                        borderRadius: "6px",
+                        backgroundColor: "#0d9488",
+                        color: "#fff",
+                        border: "none",
+                        cursor: "pointer",
+                        fontWeight: "600"
+                      }}
+                    >
+                      {translating ? "Translating..." : "✨ AI Translate"}
+                    </button>
+                  )}
+
+                  {selectedLanguage !== "original" && translations.some(t => t.language.toLowerCase() === selectedLanguage.toLowerCase()) && (
+                    <button
+                      onClick={() => setSelectedLanguage("original")}
+                      style={{
+                        padding: "4px 10px",
+                        fontSize: "12px",
+                        borderRadius: "6px",
+                        backgroundColor: "transparent",
+                        color: "var(--text-secondary)",
+                        border: "1px solid var(--border)",
+                        cursor: "pointer",
+                      }}
+                    >
+                      ↩ Show Original
+                    </button>
+                  )}
+                </div>
+
+                {/* Bounty section */}
+                {activeBounty ? (
+                  <div style={{
+                    margin: "12px 0 16px",
+                    padding: "12px 16px",
+                    borderRadius: "8px",
+                    backgroundColor: "rgba(245, 158, 11, 0.1)",
+                    border: "1px solid rgba(245, 158, 11, 0.3)",
+                    color: "#f59e0b",
+                    fontSize: "13.5px",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center"
+                  }}>
+                    <span>💰 <strong>Active Bounty:</strong> Earn <strong>{activeBounty.amount} reputation points</strong> for answering this question!</span>
+                    <span style={{ fontSize: "11px", opacity: 0.8 }}>
+                      Expires: {new Date(activeBounty.expiresAt).toLocaleDateString()}
+                    </span>
                   </div>
-
-                  <div className="detail-body">
-                    <div className="translation-controls" style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px", fontSize: "13px" }}>
-                      <span style={{ color: "var(--text-secondary)" }}>Language:</span>
-                      <select
-                        value={selectedLanguage}
-                        onChange={(e) => setSelectedLanguage(e.target.value)}
-                        style={{
-                          padding: "4px 8px",
-                          borderRadius: "6px",
-                          backgroundColor: "var(--surface-secondary, #2d2d2d)",
-                          color: "var(--text-primary)",
-                          border: "1px solid var(--border)",
-                          outline: "none"
-                        }}
-                      >
-                        <option value="original">Original (English)</option>
-                        <option value="spanish">Spanish</option>
-                        <option value="french">French</option>
-                        <option value="german">German</option>
-                        <option value="chinese">Chinese</option>
-                        <option value="japanese">Japanese</option>
-                        <option value="hindi">Hindi</option>
-                      </select>
-
-                      {selectedLanguage !== "original" && !translations.some(t => t.language.toLowerCase() === selectedLanguage.toLowerCase()) && (
+                ) : (
+                  user && (
+                    <div style={{ margin: "12px 0 16px" }}>
+                      {!showBountyForm ? (
                         <button
-                          onClick={() => handleTranslateClick(selectedLanguage)}
-                          disabled={translating}
+                          onClick={() => setShowBountyForm(true)}
                           style={{
-                            padding: "4px 10px",
+                            padding: "6px 12px",
                             fontSize: "12px",
                             borderRadius: "6px",
-                            backgroundColor: "#0d9488",
-                            color: "#fff",
-                            border: "none",
-                            cursor: "pointer",
-                            fontWeight: "600"
+                            backgroundColor: "transparent",
+                            border: "1px dashed var(--border)",
+                            color: "var(--text-secondary)",
+                            cursor: "pointer"
                           }}
                         >
-                          {translating ? "Translating..." : "✨ AI Translate"}
+                          + Sponsor Bounty
                         </button>
+                      ) : (
+                        <form onSubmit={handleCreateBounty} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px", borderRadius: "8px", border: "1px solid var(--border)", backgroundColor: "var(--surface-secondary)" }}>
+                          <span style={{ fontSize: "12.5px" }}>Reputation Points:</span>
+                          <input
+                            type="number"
+                            min="10"
+                            step="10"
+                            value={bountyAmount}
+                            onChange={(e) => setBountyAmount(e.target.value)}
+                            style={{
+                              width: "70px",
+                              padding: "4px 8px",
+                              borderRadius: "4px",
+                              border: "1px solid var(--border)",
+                              backgroundColor: "var(--bg-color)",
+                              color: "var(--text-primary)"
+                            }}
+                            required
+                          />
+                          <button
+                            type="submit"
+                            disabled={bountyLoading}
+                            style={{
+                              padding: "4px 10px",
+                              fontSize: "12px",
+                              borderRadius: "4px",
+                              backgroundColor: "#f59e0b",
+                              color: "#fff",
+                              border: "none",
+                              cursor: "pointer",
+                              fontWeight: "600"
+                            }}
+                          >
+                            {bountyLoading ? "Creating..." : "Post Bounty"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setShowBountyForm(false)}
+                            style={{
+                              padding: "4px 10px",
+                              fontSize: "12px",
+                              borderRadius: "4px",
+                              backgroundColor: "transparent",
+                              color: "var(--text-secondary)",
+                              border: "none",
+                              cursor: "pointer"
+                            }}
+                          >
+                            Cancel
+                          </button>
+                        </form>
                       )}
                     </div>
+                  )
+                )}
 
-                    {activeBounty ? (
-                      <div style={{
-                        margin: "12px 0 16px",
-                        padding: "12px 16px",
-                        borderRadius: "8px",
-                        backgroundColor: "rgba(245, 158, 11, 0.1)",
-                        border: "1px solid rgba(245, 158, 11, 0.3)",
-                        color: "#f59e0b",
-                        fontSize: "13.5px",
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center"
-                      }}>
-                        <span>💰 <strong>Active Bounty:</strong> Earn <strong>{activeBounty.amount} reputation points</strong> for answering this question!</span>
-                        <span style={{ fontSize: "11px", opacity: 0.8 }}>
-                          Expires: {new Date(activeBounty.expiresAt).toLocaleDateString()}
-                        </span>
-                      </div>
-                    ) : (
-                      user && (
-                        <div style={{ margin: "12px 0 16px" }}>
-                          {!showBountyForm ? (
-                            <button
-                              onClick={() => setShowBountyForm(true)}
-                              style={{
-                                padding: "6px 12px",
-                                fontSize: "12px",
-                                borderRadius: "6px",
-                                backgroundColor: "transparent",
-                                border: "1px dashed var(--border)",
-                                color: "var(--text-secondary)",
-                                cursor: "pointer"
-                              }}
-                            >
-                              + Sponsor Bounty
-                            </button>
-                          ) : (
-                            <form onSubmit={handleCreateBounty} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px", borderRadius: "8px", border: "1px solid var(--border)", backgroundColor: "var(--surface-secondary)" }}>
-                              <span style={{ fontSize: "12.5px" }}>Reputation Points:</span>
-                              <input
-                                type="number"
-                                min="10"
-                                step="10"
-                                value={bountyAmount}
-                                onChange={(e) => setBountyAmount(e.target.value)}
-                                style={{
-                                  width: "70px",
-                                  padding: "4px 8px",
-                                  borderRadius: "4px",
-                                  border: "1px solid var(--border)",
-                                  backgroundColor: "var(--bg-color)",
-                                  color: "var(--text-primary)"
-                                }}
-                                required
-                              />
-                              <button
-                                type="submit"
-                                disabled={bountyLoading}
-                                style={{
-                                  padding: "4px 10px",
-                                  fontSize: "12px",
-                                  borderRadius: "4px",
-                                  backgroundColor: "#f59e0b",
-                                  color: "#fff",
-                                  border: "none",
-                                  cursor: "pointer",
-                                  fontWeight: "600"
-                                }}
-                              >
-                                {bountyLoading ? "Creating..." : "Post Bounty"}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setShowBountyForm(false)}
-                                style={{
-                                  padding: "4px 10px",
-                                  fontSize: "12px",
-                                  borderRadius: "4px",
-                                  backgroundColor: "transparent",
-                                  color: "var(--text-secondary)",
-                                  border: "none",
-                                  cursor: "pointer"
-                                }}
-                              >
-                                Cancel
-                              </button>
-                            </form>
-                          )}
-                        </div>
-                      )
-                    )}                
+{activeBounty ? (
+  <div
+    style={{
+      margin: "12px 0 16px",
+      padding: "12px 16px",
+      borderRadius: "8px",
+      backgroundColor: "rgba(245, 158, 11, 0.1)",
+      border: "1px solid rgba(245, 158, 11, 0.3)",
+      color: "#f59e0b",
+      fontSize: "13.5px",
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+    }}
+  >
+    <span>
+      💰 <strong>Active Bounty:</strong> Earn{" "}
+      <strong>{activeBounty.amount} reputation points</strong> for answering
+      this question!
+    </span>
 
-                {isEditingQuestion ? (
-                  <>
-                    <input
-                      type="text"
-                      value={editQuestionData.title}
-                      onChange={(e) =>
-                        setEditQuestionData({
-                         ...editQuestionData,
-                         title: e.target.value
-                        })
-                      }
-                      className="detail-title-input"
-                      style={{
-                        width: "100%",
-                        fontSize: "2rem",
-                        fontWeight: "700",
-                        padding: "10px",
-                        marginBottom: "12px"
-                      }}
-                    />
-                    <div style={{ display: "flex", gap: "10px", marginBottom: "12px" }}>
-                      <button
-                        className="bookmark-btn"
-                        onClick={async () => {
-                          try {
-                            await updateQuery(question.id, {
-                              question: editQuestionData.title,
-                              description: editQuestionData.description,
-                              category: editQuestionData.category,
-                              tags: editQuestionData.hashtags
-                            });
-                            await refreshQuestions();
-                            setIsEditingQuestion(false);
-                          } catch (err) {
-                            console.error(err);
-                            alert("Failed to update question");
-                          }
-                        }}
-                      >
-                      Save
-                      </button>
+    <span style={{ fontSize: "11px", opacity: 0.8 }}>
+      Expires: {new Date(activeBounty.expiresAt).toLocaleDateString()}
+    </span>
+  </div>
+) : (
+  user && (
+    <div style={{ margin: "12px 0 16px" }}>
+      {!showBountyForm ? (
+        <button
+          onClick={() => setShowBountyForm(true)}
+          style={{
+            padding: "6px 12px",
+            fontSize: "12px",
+            borderRadius: "6px",
+            backgroundColor: "transparent",
+            border: "1px dashed var(--border)",
+            color: "var(--text-secondary)",
+            cursor: "pointer",
+          }}
+        >
+          + Sponsor Bounty
+        </button>
+      ) : (
+        <form
+          onSubmit={handleCreateBounty}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+            padding: "10px",
+            borderRadius: "8px",
+            border: "1px solid var(--border)",
+            backgroundColor: "var(--surface-secondary)",
+          }}
+        >
+          {/* bounty form inputs */}
+        </form>
+      )}
+    </div>
+  )
+)}
 
-                      <button
-                        className="bookmark-btn"
-                        onClick={() => {
-                          setIsEditingQuestion(false);
-                        }}
-                      >
-                      Cancel
-                      </button>
-                    </div>
-                  </>
-                  ) : (
-                    <h1 className="detail-title">
-                      {selectedLanguage !== "original" &&
-                      translations.find(
-                        (t) =>
-                          t.language.toLowerCase() === selectedLanguage.toLowerCase()
-                      )
-                        ? translations.find(
-                          (t) =>
-                            t.language.toLowerCase() === selectedLanguage.toLowerCase()
-                        ).question
-                        : question.title}
-                    </h1>
-                  )}
+{isEditingQuestion ? (
+  <>
+    <input
+      type="text"
+      value={editQuestionData.title}
+      onChange={(e) =>
+        setEditQuestionData({
+          ...editQuestionData,
+          title: e.target.value,
+        })
+      }
+      className="detail-title-input"
+      style={{
+        width: "100%",
+        fontSize: "2rem",
+        fontWeight: "700",
+        padding: "10px",
+        marginBottom: "12px",
+      }}
+    />
+
+    <div style={{ display: "flex", gap: "10px", marginBottom: "12px" }}>
+      <button
+        className="bookmark-btn"
+        onClick={async () => {
+          try {
+            await updateQuery(question.id, {
+              question: editQuestionData.title,
+              description: editQuestionData.description,
+              category: editQuestionData.category,
+              tags: editQuestionData.hashtags,
+            });
+
+            await refreshQuestions();
+            setIsEditingQuestion(false);
+          } catch (err) {
+            console.error(err);
+            alert("Failed to update question");
+          }
+        }}
+      >
+        Save
+      </button>
+
+      <button
+        className="bookmark-btn"
+        onClick={() => setIsEditingQuestion(false)}
+      >
+        Cancel
+      </button>
+    </div>
+  </>
+) : (
+  <h1 className="detail-title">
+    {selectedLanguage !== "original" &&
+    translations.find(
+      (t) =>
+        t.language.toLowerCase() === selectedLanguage.toLowerCase()
+    ) ? (
+      translations.find(
+        (t) =>
+          t.language.toLowerCase() === selectedLanguage.toLowerCase()
+      ).question
+    ) : (
+      question.title
+    )}
+  </h1>
+)}
 
                 <button
                   onClick={generateSummary}
-                  style={{
-                    marginTop: "12px",
-                    marginBottom: "12px",
-                    padding: "8px 14px",
-                    cursor: "pointer"
-                  }}
+                  style={{ marginTop: "12px", marginBottom: "12px", padding: "8px 14px", cursor: "pointer" }}
                 >
                   ✨ Generate TL;DR
                 </button>
 
-                    {summaryLoading && <p style={{ color: "#aaa", marginBottom: "12px" }}>Generating summary...</p>}
-                    {summaryError && <p role="alert" style={{ color: "#f87171", marginBottom: "12px" }}>{summaryError}</p>}
+                {summaryLoading && <p style={{ color: "#aaa", marginBottom: "12px" }}>Generating summary...</p>}
+                {summaryError && <p role="alert" style={{ color: "#f87171", marginBottom: "12px" }}>{summaryError}</p>}
 
                 {summary && (
-                  <div
-                    style={{
-                      marginBottom: "16px",
-                      padding: "12px",
-                      border: "1px solid #444",
-                      borderRadius: "8px",
-                      background: "#1e1e1e",
-                      color: "#eee"
-                    }}
-                  >
+                  <div style={{
+                    marginBottom: "16px",
+                    padding: "12px",
+                    border: "1px solid #444",
+                    borderRadius: "8px",
+                    background: "#1e1e1e",
+                    color: "#eee"
+                  }}>
                     <strong>AI Summary</strong>
                     <p style={{ marginTop: "6px", fontSize: "14px", lineHeight: "1.5" }}>{summary}</p>
                   </div>
                 )}
 
-
-
-                    {selectedLanguage !== "original" && translations.find(t => t.language.toLowerCase() === selectedLanguage.toLowerCase()) ? (
-                      <div style={{
-                        margin: "16px 0",
-                        padding: "16px",
-                        borderRadius: "12px",
-                        backgroundColor: "rgba(13, 148, 136, 0.08)",
-                        border: "1px solid rgba(13, 148, 136, 0.2)",
-                        boxShadow: "inset 0 1px 2px rgba(0,0,0,0.05)"
-                      }}>
-                        <div style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase", color: "#0d9488", marginBottom: "8px", display: "flex", alignItems: "center", gap: "6px" }}>
-                          <span className="chat-pulse-dot" style={{ display: "inline-block" }}></span>
-                          Translated Content ({translations.find(t => t.language.toLowerCase() === selectedLanguage.toLowerCase()).translationProvenance || "AI"})
-                        </div>
-                        <p style={{ margin: 0, fontSize: "14px", lineHeight: "1.6", color: "var(--text-primary)" }}>
-                          {translations.find(t => t.language.toLowerCase() === selectedLanguage.toLowerCase()).answer}
-                        </p>
-                      </div>
-                    ) : (
-                  isEditingQuestion ? (
-                    <>
-                    <select
-                    value={editQuestionData.category}
-                    onChange={(e) =>
-                      setEditQuestionData({
-                        ...editQuestionData,
-                        category: e.target.value
-                      })
-                    }
-                    style={{
-                      width: "100%",
-                      padding: "12px",
-                      marginTop: "12px",
-                      marginBottom: "12px",
-                      borderRadius: "8px"
-                      }}
-                      >
-                      <option value="">Select a category</option>
-                      <option>Programming</option>
-                      <option>Artificial Intelligence</option>
-                      <option>Career</option>
-                      <option>Research</option>
-                      <option>Scholarships</option>
-                      <option>Mathematics</option>
-                      </select>
-
-                      <input
-                         type="text"
-                         value={editQuestionData.hashtags.join(", ")}
-                         onChange={(e) =>
-                           setEditQuestionData({
-                             ...editQuestionData,
-                             hashtags: e.target.value
-                               .split(",")
-                               .map(tag => tag.trim())
-                               .filter(tag => tag)
-                           })
-                         }
-                         placeholder="e.g. AI, machine-learning, python"
-                         style={{
-                           width: "100%",
-                           padding: "12px",
-                           marginTop: "12px",
-                           marginBottom: "12px",
-                           borderRadius: "8px"
-                         }}
-                       />
-
-                    <textarea
-                     value={editQuestionData.description}
-                     onChange={(e) =>
-                       setEditQuestionData({
-                         ...editQuestionData,
-                         description: e.target.value
-                      })
-                     }
-                    rows={4}
-                    style={{
-                      width: "100%",
-                      padding: "12px",
-                      marginTop: "12px",
-                      marginBottom: "12px",
-                      borderRadius: "8px"
-                     }}
-                  />
-                  </>
-                  ) : (
-                        <p className="detail-description">{question.description}</p>
-                      )
+                {selectedLanguage !== "original" && translations.find(t => t.language.toLowerCase() === selectedLanguage.toLowerCase()) ? (
+                  <div style={{
+                    margin: "16px 0",
+                    padding: "16px",
+                    borderRadius: "12px",
+                    backgroundColor: "rgba(13, 148, 136, 0.08)",
+                    border: "1px solid rgba(13, 148, 136, 0.2)",
+                    boxShadow: "inset 0 1px 2px rgba(0,0,0,0.05)"
+                  }}>
+                    <div style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase", color: "#0d9488", marginBottom: "8px", display: "flex", alignItems: "center", gap: "6px" }}>
+                      <span className="chat-pulse-dot" style={{ display: "inline-block" }}></span>
+                      Translated Content ({translations.find(t => t.language.toLowerCase() === selectedLanguage.toLowerCase()).translationProvenance || "AI"})
+                    </div>
+                    <p style={{ margin: 0, fontSize: "14px", lineHeight: "1.6", color: "var(--text-primary)" }}>
+                      {translations.find(t => t.language.toLowerCase() === selectedLanguage.toLowerCase()).answer}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="detail-description">{question.description}</p>
                 )}
 
-                    <div className="detail-hashtags">
-                      {question.hashtags.map((tag) => (
-                        <Hashtag key={tag} tag={tag} />
-                      ))}
-                    </div>
+                <div className="detail-hashtags">
+                  {question.hashtags.map((tag) => (
+                    <Hashtag key={tag} tag={tag} />
+                  ))}
+                </div>
 
-                    <div className="detail-meta">
-                      <span>Asked by <strong>{question.author}</strong></span>
-                      <span>{question.time}</span>
-                      <span>👁 {question.views} views</span>
-                      <button
-                        className={`bookmark-btn ${question.bookmarked ? "bookmarked" : ""}`}
-                        onClick={toggleBookmark}
-                      >
-                        {question.bookmarked ? "★ Bookmarked" : "☆ Bookmark"}
-                      </button>
+                <div className="detail-meta">
+                  <span>Asked by <strong>{question.author}</strong></span>
+                  <span>{question.time}</span>
+                  <span>👁 {question.views} views</span>
+                  <button
+                    className={`bookmark-btn ${question.bookmarked ? "bookmarked" : ""}`}
+                    onClick={toggleBookmark}
+                  >
+                    {question.bookmarked ? "★ Bookmarked" : "☆ Bookmark"}
+                  </button>
 
-                  {canEdit(question) && (
+                  {canDelete(question) && (
                     <button
-                      className="bookmark-btn edit-button"
-                      onClick={()=> {
-                        setEditQuestionData({
-                          title: question.title || "",
-                          description: question.description || "",
-                          category: question.category || "",
-                          hashtags: question.hashtags || []
-                      });
-
-                      setIsEditingQuestion(true);
-                    }}
-                      >
-                     ✎ Edit
-                    </button>
-                  )}
-
-                      {canDelete(question) && (
-                        <button
-                          className="bookmark-btn danger-button"
-                          onClick={async () => {
-                            const confirmed = window.confirm(
-                              "Are you sure you want to delete this question?"
-                            );
-                            if (!confirmed) return;
-                            try {
-                              await deleteQuery(question.id);
-                              await refreshQuestions();
-                              window.history.back();
-                            } catch (err) {
-                              setError(err.message || "Failed to delete question.");
-                            }
-                          }}
-                        >
-                         🗑 Delete
-                        </button>
-                  )}
-
-                  {/*{canDelete(answer) && (
-                    <button
-                      className="bookmark-btn"
-                      onClick={() => {
-                        setEditingAnswerId(answer.id);
-                        setEditAnswerContent(answer.content);
+                      className="danger-button"
+                      onClick={async () => {
+                        try {
+                          await deleteFaq(question.id);
+                          window.history.back();
+                        } catch (err) {
+                          setError(err.message || "Failed to delete question.");
+                        }
                       }}
-                      style={{ marginLeft: "10px" }}
                     >
-                      Edit
+                      Delete
                     </button>
-                      )}*/}
+                  )}
 
-                      <div style={{ position: "relative" }} ref={followMenuRef}>
+                  <div style={{ position: "relative" }} ref={followMenuRef}>
+                    <button
+                      className={`bookmark-btn ${followData.isFollowing ? "bookmarked" : ""}`}
+                      onClick={handleFollowClick}
+                      style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
+                    >
+                      {followData.isFollowing ? (
+                        followData.isMuted ? (
+                          <>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
+                            Muted
+                          </>
+                        ) : (
+                          <>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                            Following
+                          </>
+                        )
+                      ) : (
+                        <>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                          Follow
+                        </>
+                      )}
+                    </button>
+                    {showFollowMenu && (
+                      <div style={{
+                        position: "absolute", top: "100%", right: 0, marginTop: "4px",
+                        background: "#fff", border: "1px solid #e5e5e5", borderRadius: "6px",
+                        boxShadow: "0 4px 12px rgba(0,0,0,0.1)", zIndex: 10, width: "160px",
+                        display: "flex", flexDirection: "column", padding: "4px 0"
+                      }}>
                         <button
-                          className={`bookmark-btn ${followData.isFollowing ? "bookmarked" : ""}`}
-                          onClick={handleFollowClick}
-                          style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
+  onClick={handleMuteToggle}
+  style={{
+    background: "none",
+    border: "none",
+    width: "100%",
+    textAlign: "left",
+    padding: "8px 12px",
+    fontSize: "13px",
+    cursor: "pointer",
+    color: "#1a1a1a"
+  }}
+  onMouseOver={e => e.currentTarget.style.background = "#f5f5f5"}
+  onMouseOut={e => e.currentTarget.style.background = "none"}
+>
+  {followData.isMuted ? "Unmute notifications" : "Mute notifications"}
+</button>
+                        <button
+                          onClick={handleUnfollow}
+                          style={{
+                            background: "none", border: "none", width: "100%", textAlign: "left",
+                            padding: "8px 12px", fontSize: "13px", cursor: "pointer", color: "#ef4444"
+                          }}
+                          onMouseOver={e => e.currentTarget.style.background = "#f5f5f5"}
+                          onMouseOut={e => e.currentTarget.style.background = "none"}
                         >
-                          {followData.isFollowing ? (
-                            followData.isMuted ? (
-                              <>
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
-                                Muted
-                              </>
-                            ) : (
-                              <>
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-                                Following
-                              </>
-                            )
-                          ) : (
-                            <>
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-                              Follow
-                            </>
-                          )}
+                          Unfollow
                         </button>
-                        {showFollowMenu && (
-                          <div style={{
-                            position: "absolute", top: "100%", right: 0, marginTop: "4px",
-                            background: "#fff", border: "1px solid #e5e5e5", borderRadius: "6px",
-                            boxShadow: "0 4px 12px rgba(0,0,0,0.1)", zIndex: 10, width: "160px",
-                            display: "flex", flexDirection: "column", padding: "4px 0"
-                          }}>
-                            <button
-                              onClick={handleMuteToggle}
-                              style={{
-                                background: "none", border: "none", width: "100%", textAlign: "left",
-                                padding: "8px 12px", fontSize: "13px", cursor: "pointer", color: "#1a1a1a"
-                              }}
-                              onMouseOver={e => e.currentTarget.style.background = "#f5f5f5"}
-                              onMouseOut={e => e.currentTarget.style.background = "none"}
-                            >
-                              {followData.isMuted ? "Unmute notifications" : "Mute notifications"}
-                            </button>
-                            <button
-                              onClick={handleUnfollow}
-                              style={{
-                                background: "none", border: "none", width: "100%", textAlign: "left",
-                                padding: "8px 12px", fontSize: "13px", cursor: "pointer", color: "#ef4444"
-                              }}
-                              onMouseOver={e => e.currentTarget.style.background = "#f5f5f5"}
-                              onMouseOut={e => e.currentTarget.style.background = "none"}
-                            >
-                              Unfollow
-                            </button>
-                          </div>
-                        )}
                       </div>
-                    </div>
+                    )}
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
 
-              <section className="answers-section">
-                <h2 className="answers-heading">
-                  {answers ? answers.length : 0} {answers && answers.length === 1 ? "Answer" : "Answers"}
-                </h2>
+{/* ── Answers Section ── */}
+<section className="answers-section">
+  <h2 className="answers-heading">
+    {answers ? answers.length : 0}{" "}
+    {answers && answers.length === 1 ? "Answer" : "Answers"}
+  </h2>
 
-                {answers && answers.map((answer) => (
-                  <div key={answer.id} className={`answer-card ${answer.isBest ? "best-answer" : ""}`}>
-                    <div className="vote-col">
-                      <button
-                        className={`upvote ${answer.voted ? "upvoted" : ""}`}
-                        onClick={() => toggleAnswerVote(answer.id)}
-                      >
-                        ▲
-                      </button>
-                      <span className="vote-count">{answer.votes}</span>
-                    </div>
+  {answers &&
+    answers.map((answer) => (
+      <div
+        key={answer.id}
+        className={`answer-card ${answer.isBest ? "best-answer" : ""}`}
+      >
+        <div className="vote-col">
+          <button
+            className={`upvote ${answer.voted ? "upvoted" : ""}`}
+            onClick={() => toggleAnswerVote(answer.id)}
+          >
+            ▲
+          </button>
+
+          <span className="vote-count">{answer.votes}</span>
+        </div>
 
                 <div className="answer-body">
                   {answer.isBest && (
                     <span className="best-badge">✓ Best Answer</span>
                   )}
-                  {editingAnswerId === answer.id ? (
-                    <textarea
-                      value={editAnswerContent}
-                      onChange={(e) => setEditAnswerContent(e.target.value)}
-                      rows={4}
-                      style={{
-                        width: "100%",
-                        padding: "10px",
-                        borderRadius: "8px"
-                      }}
-                    />
-                  ) : (
-                    <p className="answer-text">{answer.content}</p>
-                  )}
+                  <p className="answer-text">{answer.content}</p>
+
+                  {/* ✅ NEW: Per-answer translation controls */}
+                  <AnswerTranslationControls
+                    answerId={answer.id}
+                    originalContent={answer.content}
+                  />
+
                   <div className="answer-meta">
                     <div className="answer-author">
                       <div className="avatar small">{answer.avatar}</div>
@@ -918,6 +975,7 @@ const handleSubmitReply = async () => {
                 </div>
               </div>
             ))}
+
             {answersPagination.total > answersPagination.limit && (
               <div className="pagination-controls" style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "10px", marginTop: "15px", marginBottom: "15px" }}>
                 <button
@@ -943,42 +1001,16 @@ const handleSubmitReply = async () => {
             )}
           </section>
 
-              <section className="reply-section">
-                <h2 className="answers-heading">Your Answer</h2>
-                <textarea
-                  className="reply-textarea"
-                  placeholder="Write your answer here..."
-                  value={replyText}
-                  onChange={(e) => setReplyText(e.target.value)}
-                />
-                <button className="reply-submit" onClick={handleSubmitReply}>Post Your Answer</button>
-              </section>
-            </div>
-
-            <aside className="detail-sidebar">
-              <div className="related-widget">
-                <h4 className="widget-title">Related Questions</h4>
-                {relatedQuestions.length === 0 ? (
-                  <div className="related-empty">No related questions found.</div>
-                ) : (
-                  <div className="related-list">
-                    {relatedQuestions.map((q) => (
-                      <div key={getQuestionId(q)} className="related-item">
-                        <span className="related-item-category">{q.category}</span>
-                        <h5 className="related-item-title">
-                          <Link to={`/questions/${getQuestionId(q)}`}>{q.title}</Link>
-                        </h5>
-                        <div className="related-item-meta">
-                          <span>▲ {q.votes} votes</span>
-                          <span>💬 {q.answers ? q.answers.length : 0} answers</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </aside>
-          </div>
+          <section className="reply-section">
+            <h2 className="answers-heading">Your Answer</h2>
+            <textarea
+              className="reply-textarea"
+              placeholder="Write your answer here..."
+              value={replyText}
+              onChange={(e) => setReplyText(e.target.value)}
+            />
+            <button className="reply-submit" onClick={handleSubmitReply}>Post Your Answer</button>
+          </section>
         </main>
       </div>
       <AskQuestionModal open={showModal} onClose={() => setShowModal(false)} />

@@ -311,4 +311,17 @@ export async function queryGraphQL(query, variables = {}) {
     method: "POST",
     body: JSON.stringify({ query, variables })
   });
+
+}
+
+
+export async function fetchAnswerTranslations(answerId) {
+  return request(`/answers/${answerId}/translations`);
+}
+
+export async function createAnswerTranslation(answerId, payload) {
+  return request(`/answers/${answerId}/translations`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }

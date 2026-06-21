@@ -14,6 +14,7 @@ import { useAuth } from "../context/AuthContext";
 import { Link } from "react-router-dom";
 import AnalyticsTab from "../components/profile/AnalyticsTab";
 import NotificationPreferences from "../components/profile/NotificationPreferences";
+import ActivityVisualization from "../components/profile/ActivityVisualization";
 
 function Profile() {
   const [activeTab, setActiveTab] = useState("Overview");
@@ -93,10 +94,20 @@ function Profile() {
             </div>
           )}
 
+          {/* ✅ NEW: Activity Visualization Tab */}
+          {activeTab === "Activity" && (
+            <div className="profile-card" style={{ padding: 20 }}>
+              <ActivityVisualization />
+            </div>
+          )}
+
           {activeTab === "Analytics" && <AnalyticsTab />}
           {activeTab === "Account Settings" && <NotificationPreferences />}
 
-          {activeTab !== "Overview" && activeTab !== "Analytics" && activeTab !== "Account Settings" && (
+          {activeTab !== "Overview" &&
+            activeTab !== "Activity" &&
+            activeTab !== "Analytics" &&
+            activeTab !== "Account Settings" && (
             <div className="profile-card">
               <h2>{activeTab}</h2>
               <p>Content for {activeTab} will be implemented here.</p>
