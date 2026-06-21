@@ -792,7 +792,7 @@ Show milestone progress based on reputation increments.
 
 ## 17. Notifications Improvement
 
-Status: Frontend-Only Prototype Pending
+Status: Frontend-Only Prototype Complete
 Scope: Frontend-only
 Priority: Medium
 
@@ -813,6 +813,18 @@ Improve notification display and interactions.
 
 - Notification UI is clearer and more usable.
 - Existing backend notification behavior is preserved.
+
+### Implementation Evidence
+
+- Created `frontend/src/components/notifications/NotificationCard.jsx` — card with type icons (answer/question/upvote/warning/follow/info), color-coded dot, relative timestamp, read/unread styling, mark-read on click, delete button.
+- Created `frontend/src/components/notifications/NotificationGroup.jsx` — sticky group section headers (Today, Yesterday, This Week, Older).
+- Created `frontend/src/components/notifications/NotificationFilters.jsx` — filter chips (All, Answers, Questions, Upvotes, Warnings) with client-side filtering.
+- Created `frontend/src/components/notifications/NotificationSearch.jsx` — search input with clear button, filters by message text client-side.
+- Created `frontend/src/components/notifications/NotificationCenter.jsx` — main container with loading skeleton, error state, empty states (all-caught-up, no-matching-results), grouped display, "Mark all read" action, fetch/delete/read state management.
+- Updated `frontend/src/components/Topbar.jsx` — replaced inline notification dropdown with `<NotificationCenter />` component.
+- Added all notification styles to `frontend/src/styles/style.css` (`.notif-center`, `.notif-card`, `.notif-group`, `.notif-filters`, `.notif-search`, loading/empty/error states, dark mode).
+- No backend routes, database migrations, or schema changes introduced.
+- Uses existing `fetchNotifications`, `markNotificationsAsRead`, `markNotificationAsRead`, `deleteNotification` from `faqApi.js`.
 
 ---
 
@@ -889,7 +901,7 @@ Show verified/expert badges on answers by expert-classified users.
 
 ## 21. Notification Filters
 
-Status: Frontend-Only Prototype Pending
+Status: Frontend-Only Prototype Complete
 Scope: Frontend-only
 Priority: Medium
 
@@ -899,10 +911,10 @@ Add notification filters.
 
 ### Required Filters
 
-- New
-- Old
+- All
 - Answers only
-- Questions followed
+- Questions only
+- Upvotes only
 - Flags/warnings
 
 ### Required UI Work
@@ -915,6 +927,13 @@ Add notification filters.
 
 - Filters work on currently loaded notifications.
 - No backend notification filtering route is added.
+
+### Implementation Evidence
+
+- Implemented via `NotificationFilters.jsx` with chip-based filter bar (All, Answers, Questions, Upvotes, Warnings).
+- Filter state flows through `NotificationCenter.jsx` — client-side filtering using type inference from message text.
+- Empty state shows "No notifications to show for this filter" when filter yields zero results.
+- No backend changes introduced.
 
 ---
 
