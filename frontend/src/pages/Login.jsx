@@ -111,40 +111,101 @@ function Login() {
       <div className="auth-glow-circle auth-glow-1"></div>
       <div className="auth-glow-circle auth-glow-2"></div>
 
-      {/* Floating back home button */}
-      <Link to="/" className="auth-back-home" tabIndex={1}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <line x1="19" y1="12" x2="5" y2="12"></line>
-          <polyline points="12 19 5 12 12 5"></polyline>
-        </svg>
-        Back to Dashboard
-      </Link>
+      <div className="auth-split-layout">
+        {/* Left Panel - Brand / Illustration */}
+        <div className="auth-split-left">
+          <div className="auth-hero">
+            <div className="auth-hero-illustration">
+              <div className="auth-hero-glow"></div>
 
-      <div className="auth-theme-float">
-        <button
-          className={`theme-toggle-btn ${theme}`}
-          onClick={toggleTheme}
-          title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
-          aria-label={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
-          tabIndex={2}
-        >
-          <div className="theme-icon-container">
-            <svg className="sun-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="5" />
-              <line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" />
-              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-              <line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" />
-              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-            </svg>
-            <svg className="moon-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-            </svg>
+              <div className="auth-hero-ring"></div>
+              <div className="auth-hero-ring"></div>
+              <div className="auth-hero-ring"></div>
+
+              <svg className="auth-hero-lines" viewBox="0 0 300 300">
+                <line x1="150" y1="90" x2="200" y2="25" stroke="rgba(99,102,241,0.12)" strokeWidth="1" strokeDasharray="3,4" />
+                <line x1="150" y1="90" x2="15" y2="170" stroke="rgba(99,102,241,0.08)" strokeWidth="1" strokeDasharray="3,4" />
+                <line x1="150" y1="90" x2="285" y2="200" stroke="rgba(99,102,241,0.08)" strokeWidth="1" strokeDasharray="3,4" />
+                <line x1="150" y1="90" x2="155" y2="270" stroke="rgba(59,130,246,0.08)" strokeWidth="1" strokeDasharray="2,4" />
+              </svg>
+
+              <div className="auth-hero-sphere">
+                <span className="auth-hero-question">?</span>
+              </div>
+
+              <div className="auth-hero-bubble">
+                <div className="auth-hero-bubble-dot"></div>
+                <div className="auth-hero-bubble-line"></div>
+              </div>
+              <div className="auth-hero-bubble">
+                <div className="auth-hero-bubble-dot"></div>
+                <div className="auth-hero-bubble-line"></div>
+              </div>
+              <div className="auth-hero-bubble">
+                <div className="auth-hero-bubble-dot"></div>
+                <div className="auth-hero-bubble-line"></div>
+              </div>
+
+              <div className="auth-hero-card">
+                <div className="auth-hero-card-line" style={{ width: '65%' }}></div>
+                <div className="auth-hero-card-line" style={{ width: '40%' }}></div>
+              </div>
+              <div className="auth-hero-card">
+                <div className="auth-hero-card-line" style={{ width: '55%' }}></div>
+                <div className="auth-hero-card-line" style={{ width: '45%' }}></div>
+              </div>
+
+              <div className="auth-hero-particle"></div>
+              <div className="auth-hero-particle"></div>
+              <div className="auth-hero-particle"></div>
+              <div className="auth-hero-particle"></div>
+              <div className="auth-hero-particle"></div>
+              <div className="auth-hero-particle"></div>
+            </div>
+
+            <div className="auth-hero-footer">
+              <div className="auth-hero-brand">Crowd Source FAQ</div>
+              <div className="auth-hero-tagline">Ask. Learn. Share.</div>
+            </div>
           </div>
-        </button>
-      </div>
+        </div>
 
-      {/* Auth Card */}
-      <div className="auth-card">
+        {/* Right Panel - Form */}
+        <div className="auth-split-right">
+          {/* Floating back home button */}
+          <Link to="/" className="auth-back-home" tabIndex={1}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="19" y1="12" x2="5" y2="12"></line>
+              <polyline points="12 19 5 12 12 5"></polyline>
+            </svg>
+            Back to Home
+          </Link>
+
+          <div className="auth-theme-float">
+            <button
+              className={`theme-toggle-btn ${theme}`}
+              onClick={toggleTheme}
+              title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
+              aria-label={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
+              tabIndex={2}
+            >
+              <div className="theme-icon-container">
+                <svg className="sun-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="5" />
+                  <line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" />
+                  <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                  <line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" />
+                  <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+                </svg>
+                <svg className="moon-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                </svg>
+              </div>
+            </button>
+          </div>
+
+          {/* Auth Card */}
+          <div className="auth-card">
         <div className="auth-header">
           <div className="auth-logo">
             <div className="auth-logo-icon">Q</div>
@@ -273,6 +334,8 @@ function Login() {
         <div className="auth-switch">
           Don't have an account? 
           <Link to="/signup" className="auth-switch-link" tabIndex={10}>Sign Up</Link>
+        </div>
+      </div>
         </div>
       </div>
     </div>
