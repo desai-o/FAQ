@@ -180,7 +180,7 @@ const defaultQuestion = {
 };
 
 function QuestionDetail() {
-  const { questions, upvoteQuestion, bookmarkQuestion, addAnswer, upvoteAnswer } = useFAQ();
+  const { questions, upvoteQuestion, bookmarkQuestion, addAnswer, upvoteAnswer, setQuestionAnswers, loadingQuestions, refreshQuestions } = useFAQ();
   const { id } = useParams();
   const [showModal, setShowModal] = useState(false);
   const [replyText, setReplyText] = useState("");
@@ -311,17 +311,17 @@ function QuestionDetail() {
     }
   };
 
-  useEffect(() => {
-    if (id && id !== "test-id" && id !== "undefined") {
-      loadAnswers(0);
-      loadTranslations();
-      loadBounties();
-    } else {
-      if (question && question.answers) {
-        setAnswers(question.answers);
-      }
-    }
-  }, [id, question.answers]);
+useEffect(() => {
+  if (loadingQuestions) return;
+
+  if (id && id !== "test-id" && id !== "undefined") {
+    loadAnswers(0);
+    loadTranslations();
+    loadBounties();
+  } else if (question?.answers) {
+    setAnswers(question.answers);
+  }
+}, [id, question?.answers, loadingQuestions]);
 
   function canDelete(resource) {
     if (!user || !resource) return false;
@@ -394,12 +394,27 @@ function QuestionDetail() {
     if (question.id) upvoteAnswer(question.id, answerId);
   };
 
-  const handleSubmitReply = () => {
-    if (replyText.trim() && question.id) {
-      addAnswer(question.id, replyText);
-      setReplyText("");
+const handleSubmitReply = async () => {
+  if (!replyText.trim() || !question.id) return;
+
+  try {
+    const newAnswer = await addAnswer(
+      question.id,
+      replyText,
+      question.sourceType || "faq"
+    );
+
+    if (newAnswer) {
+      setAnswers((prev) => [newAnswer, ...prev]);
     }
-  };
+
+    setReplyText("");
+    setError("");
+  } catch (err) {
+    console.error("Failed to submit answer:", err);
+    setError(err.message || "Failed to post your answer.");
+  }
+};
 
   const generateSummary = async () => {
     try {
@@ -599,11 +614,137 @@ function QuestionDetail() {
                   )
                 )}
 
-                <h1 className="detail-title">
-                  {selectedLanguage !== "original" && translations.find(t => t.language.toLowerCase() === selectedLanguage.toLowerCase())
-                    ? translations.find(t => t.language.toLowerCase() === selectedLanguage.toLowerCase()).question
-                    : question.title}
-                </h1>
+{activeBounty ? (
+  <div
+    style={{
+      margin: "12px 0 16px",
+      padding: "12px 16px",
+      borderRadius: "8px",
+      backgroundColor: "rgba(245, 158, 11, 0.1)",
+      border: "1px solid rgba(245, 158, 11, 0.3)",
+      color: "#f59e0b",
+      fontSize: "13.5px",
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+    }}
+  >
+    <span>
+      💰 <strong>Active Bounty:</strong> Earn{" "}
+      <strong>{activeBounty.amount} reputation points</strong> for answering
+      this question!
+    </span>
+
+    <span style={{ fontSize: "11px", opacity: 0.8 }}>
+      Expires: {new Date(activeBounty.expiresAt).toLocaleDateString()}
+    </span>
+  </div>
+) : (
+  user && (
+    <div style={{ margin: "12px 0 16px" }}>
+      {!showBountyForm ? (
+        <button
+          onClick={() => setShowBountyForm(true)}
+          style={{
+            padding: "6px 12px",
+            fontSize: "12px",
+            borderRadius: "6px",
+            backgroundColor: "transparent",
+            border: "1px dashed var(--border)",
+            color: "var(--text-secondary)",
+            cursor: "pointer",
+          }}
+        >
+          + Sponsor Bounty
+        </button>
+      ) : (
+        <form
+          onSubmit={handleCreateBounty}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+            padding: "10px",
+            borderRadius: "8px",
+            border: "1px solid var(--border)",
+            backgroundColor: "var(--surface-secondary)",
+          }}
+        >
+          {/* bounty form inputs */}
+        </form>
+      )}
+    </div>
+  )
+)}
+
+{isEditingQuestion ? (
+  <>
+    <input
+      type="text"
+      value={editQuestionData.title}
+      onChange={(e) =>
+        setEditQuestionData({
+          ...editQuestionData,
+          title: e.target.value,
+        })
+      }
+      className="detail-title-input"
+      style={{
+        width: "100%",
+        fontSize: "2rem",
+        fontWeight: "700",
+        padding: "10px",
+        marginBottom: "12px",
+      }}
+    />
+
+    <div style={{ display: "flex", gap: "10px", marginBottom: "12px" }}>
+      <button
+        className="bookmark-btn"
+        onClick={async () => {
+          try {
+            await updateQuery(question.id, {
+              question: editQuestionData.title,
+              description: editQuestionData.description,
+              category: editQuestionData.category,
+              tags: editQuestionData.hashtags,
+            });
+
+            await refreshQuestions();
+            setIsEditingQuestion(false);
+          } catch (err) {
+            console.error(err);
+            alert("Failed to update question");
+          }
+        }}
+      >
+        Save
+      </button>
+
+      <button
+        className="bookmark-btn"
+        onClick={() => setIsEditingQuestion(false)}
+      >
+        Cancel
+      </button>
+    </div>
+  </>
+) : (
+  <h1 className="detail-title">
+    {selectedLanguage !== "original" &&
+    translations.find(
+      (t) =>
+        t.language.toLowerCase() === selectedLanguage.toLowerCase()
+    ) ? (
+      translations.find(
+        (t) =>
+          t.language.toLowerCase() === selectedLanguage.toLowerCase()
+      ).question
+    ) : (
+      question.title
+    )}
+  </h1>
+)}
 
                 <button
                   onClick={generateSummary}
@@ -716,16 +857,22 @@ function QuestionDetail() {
                         display: "flex", flexDirection: "column", padding: "4px 0"
                       }}>
                         <button
-                          onClick={handleMuteToggle}
-                          style={{
-                            background: "none", border: "none", width: "100%", textAlign: "left",
-                            padding: "8px 12px", fontSize: "13px", cursor: "pointer", color: "#1a1a1a"
-                          }}
-                          onMouseOver={e => e.currentTarget.style.background = "#f5f5f5"}
-                          onMouseOut={e => e.currentTarget.style.background = "none"}
-                        >
-                          {followData.isMuted ? "Unmute notifications" : "Mute notifications"}
-                        </button>
+  onClick={handleMuteToggle}
+  style={{
+    background: "none",
+    border: "none",
+    width: "100%",
+    textAlign: "left",
+    padding: "8px 12px",
+    fontSize: "13px",
+    cursor: "pointer",
+    color: "#1a1a1a"
+  }}
+  onMouseOver={e => e.currentTarget.style.background = "#f5f5f5"}
+  onMouseOut={e => e.currentTarget.style.background = "none"}
+>
+  {followData.isMuted ? "Unmute notifications" : "Mute notifications"}
+</button>
                         <button
                           onClick={handleUnfollow}
                           style={{
@@ -745,24 +892,29 @@ function QuestionDetail() {
             </div>
           </div>
 
-          {/* ── Answers Section ── */}
-          <section className="answers-section">
-            <h2 className="answers-heading">
-              {question.answers ? question.answers.length : 0}{" "}
-              {question.answers && question.answers.length === 1 ? "Answer" : "Answers"}
-            </h2>
+{/* ── Answers Section ── */}
+<section className="answers-section">
+  <h2 className="answers-heading">
+    {answers ? answers.length : 0}{" "}
+    {answers && answers.length === 1 ? "Answer" : "Answers"}
+  </h2>
 
-            {answers && answers.map((answer) => (
-              <div key={answer.id} className={`answer-card ${answer.isBest ? "best-answer" : ""}`}>
-                <div className="vote-col">
-                  <button
-                    className={`upvote ${answer.voted ? "upvoted" : ""}`}
-                    onClick={() => toggleAnswerVote(answer.id)}
-                  >
-                    ▲
-                  </button>
-                  <span className="vote-count">{answer.votes}</span>
-                </div>
+  {answers &&
+    answers.map((answer) => (
+      <div
+        key={answer.id}
+        className={`answer-card ${answer.isBest ? "best-answer" : ""}`}
+      >
+        <div className="vote-col">
+          <button
+            className={`upvote ${answer.voted ? "upvoted" : ""}`}
+            onClick={() => toggleAnswerVote(answer.id)}
+          >
+            ▲
+          </button>
+
+          <span className="vote-count">{answer.votes}</span>
+        </div>
 
                 <div className="answer-body">
                   {answer.isBest && (

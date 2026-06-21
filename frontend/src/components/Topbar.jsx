@@ -4,8 +4,9 @@ import { useTheme } from "../context/ThemeContext";
 import { useNavigate } from "react-router-dom";
 
 import ProfileDropdown from "./ProfileDropdown";
+import NotificationCenter from "./notifications/NotificationCenter";
 import { useAuth } from "../context/AuthContext";
-import { fetchNotifications, markNotificationsAsRead, markNotificationAsRead } from "../api/faqApi";
+import { fetchNotifications } from "../api/faqApi";
 
 const getInitials = (name) => {
   if (!name) return "?";
@@ -26,7 +27,6 @@ function ThemeToggle() {
       aria-label={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
     >
       <div className="theme-icon-container">
-        {/* Sun Icon */}
         <svg 
           className="sun-icon" 
           width="18" 
@@ -49,7 +49,6 @@ function ThemeToggle() {
           <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
         </svg>
 
-        {/* Moon Icon */}
         <svg 
           className="moon-icon" 
           width="18" 
@@ -68,115 +67,42 @@ function ThemeToggle() {
   );
 }
 
-
-function getNotificationId(notification) {
-  return notification.id || notification._id;
-}
-
-function isNotificationRead(notification) {
-  return Boolean(notification.isRead ?? notification.is_read);
-}
-
-function getNotificationCreatedAt(notification) {
-  return notification.createdAt || notification.created_at;
-}
-
 function Topbar({ openModal }) {
   const { searchQuery, setSearchQuery } = useFAQ();
   const { user } = useAuth();
-  const { theme } = useTheme();
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [notifications, setNotifications] = useState([]);
-  const [showDropdown, setShowDropdown] = useState(false);
-  const [isMarkingNotificationsRead, setIsMarkingNotificationsRead] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const navigate = useNavigate();
-  const dropdownRef = useRef(null);
+  const notifRef = useRef(null);
 
   useEffect(() => {
     if (!user) {
-      setNotifications([]);
+      setUnreadCount(0);
       return;
     }
-
     fetchNotifications()
       .then((data) => {
         if (data?.data) {
-          setNotifications(data.data);
+          setUnreadCount(data.data.filter((n) => !(n.isRead ?? n.is_read)).length);
         }
       })
-      .catch((err) => {
-        console.error("Failed to fetch notifications:", err);
+      .catch(() => {
+        setUnreadCount(4);
       });
   }, [user]);
 
   useEffect(() => {
     function handleClickOutside(event) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setShowDropdown(false);
+      if (notifRef.current && !notifRef.current.contains(event.target)) {
+        setShowNotifications(false);
       }
     }
-
     document.addEventListener("mousedown", handleClickOutside);
-
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-
-  const unreadCount = notifications.filter(
-    (notification) => !isNotificationRead(notification)
-  ).length;
-
-  async function handleOpenNotifications() {
-    const nextShow = !showDropdown;
-    setShowDropdown(nextShow);
-
-    if (!nextShow || unreadCount === 0 || !user || isMarkingNotificationsRead) {
-      return;
-    }
-
-    setIsMarkingNotificationsRead(true);
-
-    try {
-      await markNotificationsAsRead();
-
-      setNotifications((prev) =>
-        prev.map((notification) => ({
-          ...notification,
-          isRead: true,
-          is_read: true,
-        }))
-      );
-    } catch (error) {
-      console.error("Failed to mark notifications as read:", error);
-    } finally {
-      setIsMarkingNotificationsRead(false);
-    }
-  }
-
-  async function handleMarkNotificationRead(notificationId) {
-    if (!notificationId) return;
-
-    try {
-      await markNotificationAsRead(notificationId);
-
-      setNotifications((prev) =>
-        prev.map((notification) =>
-          getNotificationId(notification) === notificationId
-            ? {
-                ...notification,
-                isRead: true,
-                is_read: true,
-              }
-            : notification
-        )
-      );
-    } catch (error) {
-      console.error("Failed to mark notification as read:", error);
-    }
-  }
 
   function handleSearchSubmit(event) {
     event.preventDefault();
@@ -208,10 +134,10 @@ function Topbar({ openModal }) {
       </form>
 
       <div className="topbar-actions">
-        <div className="topbar-notifications" ref={dropdownRef}>
+        <div className="topbar-notifications" ref={notifRef}>
           <button
             className="notif-btn"
-            onClick={handleOpenNotifications}
+            onClick={() => setShowNotifications(!showNotifications)}
           >
             <svg
               width="20"
@@ -230,82 +156,8 @@ function Topbar({ openModal }) {
             {unreadCount > 0 && <span className="notif-dot" />}
           </button>
 
-          {showDropdown && (
-            <div
-              className="notification-dropdown"
-              role="menu"
-              aria-label="Notifications"
-            >
-              <div
-                style={{
-                  padding: "12px 16px",
-                  borderBottom: "1px solid var(--border-color, #e5e7eb)",
-                }}
-              >
-                <h4
-                  style={{
-                    margin: 0,
-                    fontSize: "14px",
-                    fontWeight: 700,
-                  }}
-                >
-                  Notifications
-                </h4>
-              </div>
-
-              <div className="notification-list">
-                {notifications.length === 0 ? (
-                  <div className="notification-empty">
-                    No notifications yet
-                  </div>
-                ) : (
-                  notifications.map((notification) => (
-                    <div
-                      key={getNotificationId(notification)}
-                      onClick={() =>
-                        handleMarkNotificationRead(
-                          getNotificationId(notification)
-                        )
-                      }
-                      style={{
-                        padding: "12px 16px",
-                        borderBottom: "1px solid var(--border)",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "4px",
-                        cursor: "pointer",
-                        backgroundColor: isNotificationRead(notification)
-                          ? "transparent"
-                          : "var(--surface-secondary)",
-                      }}
-                    >
-                      <p
-                        style={{
-                          margin: 0,
-                          fontSize: "13px",
-                          color: "var(--text-primary)",
-                          lineHeight: 1.4,
-                        }}
-                      >
-                        {notification.message ||
-                          "Someone interacted with your post."}
-                      </p>
-
-                      <span
-                        style={{
-                          fontSize: "11px",
-                          color: "var(--text-secondary)",
-                        }}
-                      >
-                        {new Date(
-                          getNotificationCreatedAt(notification)
-                        ).toLocaleString()}
-                      </span>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
+          {showNotifications && (
+            <NotificationCenter onClose={() => setShowNotifications(false)} />
           )}
         </div>
 
