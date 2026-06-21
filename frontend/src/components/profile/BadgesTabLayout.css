@@ -1,0 +1,23 @@
+.badges-tab-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.badges-top-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 18px;
+}
+
+.badges-right-col {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+@media (max-width: 1100px) {
+  .badges-top-row {
+    grid-template-columns: 1fr;
+  }
+}

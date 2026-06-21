@@ -1,0 +1,169 @@
+.badge-grid-card {
+  background: var(--bg-white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 16px 18px;
+  box-shadow: var(--shadow-card);
+}
+
+.badge-grid-head {
+  margin-bottom: 14px;
+}
+
+.badge-grid-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-heading);
+}
+
+.badge-grid-subtitle {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.badge-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 768px) {
+  .badge-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.badge-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  background: var(--bg-table-head);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 20px 14px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.badge-card.badge-earned:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-hover);
+}
+
+.badge-card.badge-locked {
+  opacity: 0.55;
+}
+
+.badge-icon-circle {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+
+/* Per-badge colors, built from your existing --cat-icon-*-bg tokens
+   so they automatically adjust in dark mode the same way category
+   icons already do elsewhere in the app. */
+.badge-color-purple {
+  background: var(--cat-icon-purple-bg);
+  color: var(--accent-purple);
+}
+.badge-color-blue {
+  background: var(--cat-icon-blue-bg);
+  color: var(--accent-blue);
+}
+.badge-color-green {
+  background: var(--cat-icon-green-bg);
+  color: var(--accent-green);
+}
+.badge-color-orange {
+  background: var(--cat-icon-orange-bg);
+  color: var(--accent-orange);
+}
+.badge-color-yellow {
+  background: var(--cat-icon-yellow-bg);
+  color: var(--accent-yellow);
+}
+.badge-color-red {
+  background: var(--cat-icon-red-bg);
+  color: var(--accent-red);
+}
+/* "teal" has no direct token in style.css, so it reuses the green
+   family — closest existing match, keeps us inside your token system
+   instead of inventing a new color. */
+.badge-color-teal {
+  background: var(--cat-icon-green-bg);
+  color: var(--accent-green);
+}
+.badge-color-gray {
+  background: var(--bg-table-head);
+  color: var(--text-light);
+  border: 1px solid var(--border);
+}
+
+.badge-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-heading);
+  margin-bottom: 4px;
+}
+
+.badge-description {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  margin-bottom: 8px;
+}
+
+.badge-earned-date {
+  font-size: 11px;
+  color: var(--text-light);
+}
+
+/* Loading skeleton */
+.badge-skeleton-circle,
+.badge-skeleton-line {
+  background: var(--border);
+  border-radius: var(--radius-sm);
+  animation: badge-pulse 1.4s ease-in-out infinite;
+}
+
+.badge-skeleton-circle {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  margin-bottom: 12px;
+}
+
+.badge-skeleton-line {
+  height: 10px;
+  margin-bottom: 8px;
+}
+
+@keyframes badge-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Empty state */
+.badge-grid-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+[data-theme="dark"] .badge-grid-card {
+  background: #000000;
+  border-color: #222222;
+}
+
+[data-theme="dark"] .badge-card {
+  background: #111111;
+  border-color: #222222;
+}

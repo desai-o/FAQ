@@ -1,0 +1,163 @@
+.milestone-timeline-card {
+  background: var(--bg-white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 16px 18px;
+  box-shadow: var(--shadow-card);
+}
+
+.milestone-timeline-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-heading);
+}
+
+.milestone-timeline-row {
+  position: relative;
+  margin-top: 24px;
+  padding: 0 4px;
+}
+
+/* The full-width background track */
+.milestone-track {
+  position: absolute;
+  top: 7px; /* vertically centers with the 14px dots below */
+  left: 4px;
+  right: 4px;
+  height: 3px;
+  background: var(--border);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.milestone-track-fill {
+  height: 100%;
+  background: var(--accent-blue);
+  border-radius: 99px;
+  transition: width 0.4s ease;
+}
+
+/* Dots + labels sit ON TOP of the track, evenly spaced */
+.milestone-dots {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+}
+
+.milestone-stop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 0 0 auto;
+  text-align: center;
+}
+
+.milestone-stop:first-child {
+  align-items: flex-start;
+}
+
+.milestone-stop:first-child .milestone-label,
+.milestone-stop:first-child .milestone-threshold {
+  text-align: left;
+}
+
+.milestone-stop:last-child {
+  align-items: flex-end;
+}
+
+.milestone-stop:last-child .milestone-label,
+.milestone-stop:last-child .milestone-threshold {
+  text-align: right;
+}
+
+.milestone-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--bg-white);
+  border: 2px solid var(--border);
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+  transition: background 0.3s ease, border-color 0.3s ease;
+}
+
+.milestone-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-top: 10px;
+  padding: 0 4px;
+}
+
+.milestone-threshold {
+  font-size: 10.5px;
+  color: var(--text-light);
+  margin-top: 2px;
+}
+
+/* Past milestone: filled dot, accent ring */
+.milestone-past .milestone-dot {
+  background: var(--accent-blue);
+  border-color: var(--accent-blue);
+}
+.milestone-past .milestone-label {
+  color: var(--text-heading);
+}
+
+/* Current milestone: larger dot, highlighted label */
+.milestone-current .milestone-dot {
+  width: 18px;
+  height: 18px;
+  background: var(--accent-blue);
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 4px var(--hashtag-bg);
+}
+.milestone-current .milestone-label {
+  color: var(--accent-blue);
+  font-weight: 700;
+}
+
+/* Upcoming: stays neutral/gray, already the default styling above */
+
+/* Loading skeleton */
+.milestone-skeleton-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--border);
+  animation: milestone-pulse 1.4s ease-in-out infinite;
+  margin: 0 auto;
+}
+
+.milestone-skeleton-label {
+  width: 70%;
+  height: 10px;
+  background: var(--border);
+  border-radius: var(--radius-sm);
+  margin: 10px auto 0;
+  animation: milestone-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes milestone-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+[data-theme="dark"] .milestone-timeline-card {
+  background: #000000;
+  border-color: #222222;
+}
+
+@media (max-width: 768px) {
+  .milestone-timeline-row {
+    flex-wrap: wrap;
+    row-gap: 24px;
+  }
+  .milestone-stop {
+    flex: 1 1 33%;
+  }
+  .milestone-line {
+    display: none; /* lines don't make sense once stops wrap to multiple rows */
+  }
+}
