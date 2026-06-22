@@ -243,6 +243,10 @@ export async function fetchFaqById(faqId) {
   return request(`/faqs/${faqId}`);
 }
 
+export async function fetchQueryById(queryId) {
+  return request(`/queries/${queryId}`);
+}
+
 export async function createBounty(payload) {
   return request("/bounties", {
     method: "POST",
@@ -339,6 +343,17 @@ export async function createAnswerTranslation(answerId, payload) {
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+export async function createQueryTranslation(queryId, payload) {
+  return request(`/queries/${queryId}/translations`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function fetchQueryTranslations(queryId) {
+  return request(`/queries/${queryId}/translations`);
 }
 export async function fetchContributorLeaderboard() {
   return request("/contributors/leaderboard");

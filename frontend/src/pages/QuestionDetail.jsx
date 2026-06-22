@@ -9,7 +9,8 @@ import { useAuth } from "../context/AuthContext";
 import {
   deleteFaq, deleteQuery, deleteAnswer, updateAnswer, updateQuery,
   followResource, unfollowResource, muteFollow,
-  fetchAnswers, fetchFaqTranslations, createFaqTranslation, fetchFaqById, createAnswerTranslation, fetchAnswerTranslations,
+  fetchAnswers, fetchFaqTranslations, createFaqTranslation, fetchFaqById, fetchQueryById, createAnswerTranslation, fetchAnswerTranslations,
+  createQueryTranslation, fetchQueryTranslations,
   createBounty, awardBounty, fetchBounties,
 } from "../api/faqApi";
 import ErrorToast from "../components/ErrorToast";
@@ -117,6 +118,8 @@ function normalizeRemoteQuestion(data) {
     answers: data.answers || [],
     mongo_id: data.mongo_id,
     _id: data._id,
+    // sourceType is set by loadQuestionDetail after resolving FAQ vs Query
+    sourceType: data.sourceType || null,
   };
 }
 
@@ -199,7 +202,10 @@ function QuestionDetail() {
 
   const loadTranslations = async () => {
     try {
-      const res = await fetchFaqTranslations(id);
+      const isQuery = question.sourceType === "query";
+      const res = isQuery
+        ? await fetchQueryTranslations(id)
+        : await fetchFaqTranslations(id);
       if (res && res.data) {
         // Normalize language codes coming from backend (can be 'hindi' or 'hi')
         const normalized = (res.data || []).map((t) => ({
@@ -235,12 +241,27 @@ function QuestionDetail() {
     if (!id) return;
     try {
       setQuestionLoading(true);
-      const res = await fetchFaqById(id);
+      // Try as FAQ first, fall back to UserQuery
+      let res = null;
+      let resolvedType = "faq";
+      try {
+        res = await fetchFaqById(id);
+      } catch (faqErr) {
+        // Not a FAQ — try as a query
+        try {
+          res = await fetchQueryById(id);
+          resolvedType = "query";
+        } catch (queryErr) {
+          console.error("Failed to load as FAQ or Query:", queryErr.message);
+        }
+      }
       if (res && res.data) {
-        setRemoteQuestion(normalizeRemoteQuestion(res.data));
+        const normalized = normalizeRemoteQuestion(res.data);
+        normalized.sourceType = resolvedType;
+        setRemoteQuestion(normalized);
       }
     } catch (err) {
-      console.error("Failed to load FAQ detail:", err);
+      console.error("Failed to load question detail:", err);
     } finally {
       setQuestionLoading(false);
     }
@@ -300,7 +321,10 @@ function QuestionDetail() {
     setTranslating(true);
     setError("");
     try {
-      const res = await createFaqTranslation(id, { language: normalizedLang });
+      const isQuery = question.sourceType === "query";
+      const res = isQuery
+        ? await createQueryTranslation(id, { language: normalizedLang })
+        : await createFaqTranslation(id, { language: normalizedLang });
 
       if (res && res.data) {
         const entry = res.data;
@@ -1109,8 +1133,6 @@ useEffect(() => {
                   {answer.isBest && (
                     <span className="best-badge">✓ Best Answer</span>
                   )}
-                  <p className="answer-text">{answer.content}</p>
-
                   <AnswerTranslationControls
                     answerId={answer.id}
                     originalContent={answer.content}
