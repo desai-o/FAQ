@@ -508,21 +508,6 @@ export function FAQProvider({ children }) {
     }
   }
 
-  // Persist answers for a specific question into the questions cache
-  const setQuestionAnswers = (questionId, answersArray) => {
-    try {
-      setQuestions((prev) =>
-        prev.map((q) =>
-          String(q.id) === String(questionId)
-            ? { ...q, answers: Array.isArray(answersArray) ? answersArray : [] }
-            : q
-        )
-      );
-    } catch (err) {
-      console.error("Failed to set question answers in context:", err);
-    }
-  };
-
   const addQuestion = async (title, category, description, hashtagsString) => {
     requireLoggedInAction("ask a question");
 
@@ -625,6 +610,35 @@ export function FAQProvider({ children }) {
       )
     );
   };
+  const restoreQuestion = (question) => {
+    setQuestions((prev) => [question, ...prev]);
+  };
+  const removeAnswerLocally = (questionId, answerId) => {
+  setQuestions((prev) =>
+    prev.map((q) =>
+      String(q.id) === String(questionId)
+        ? {
+            ...q,
+            answers: (q.answers || []).filter(
+              (a) => String(a.id) !== String(answerId)
+            )
+          }
+        : q
+    )
+  );
+};
+const restoreAnswerLocally = (questionId, answer) => {
+  setQuestions((prev) =>
+    prev.map((q) =>
+      String(q.id) === String(questionId)
+        ? {
+            ...q,
+            answers: [answer, ...(q.answers || [])]
+          }
+        : q
+    )
+  );
+};
   const upvoteQuestion = async (id) => {
     requireLoggedInAction("upvote");
 
@@ -691,24 +705,21 @@ export function FAQProvider({ children }) {
 
     const author = user?.name || "Community Member";
 
-    const submitPayload = {
-      content: cleanContent,
-      author
-    };
-
+    const payload = { content: cleanContent, author };
     if (sourceType === "query") {
-      submitPayload.queryId = questionId;
+      payload.queryId = questionId;
     } else {
-      submitPayload.questionId = questionId;
+      payload.questionId = questionId;
     }
 
     try {
-      const response = await submitAnswer(submitPayload);
+      const response = await submitAnswer(payload);
 
       const savedAnswer = response.data;
 
       const newAnswer = {
         id: savedAnswer._id || savedAnswer.id,
+        userId: savedAnswer.userId || savedAnswer.user_id || user?.id,
         author: savedAnswer.author || author,
         avatar: (savedAnswer.author || author).charAt(0).toUpperCase(),
         content: savedAnswer.content,
@@ -832,8 +843,10 @@ export function FAQProvider({ children }) {
         bookmarkQuestion,
         editQuestion,
         deleteQuestion,
+        restoreQuestion,
+        removeAnswerLocally,
+        restoreAnswerLocally,
         addAnswer,
-        setQuestionAnswers,
         upvoteAnswer,
         backendOnline,
         loadingQuestions,

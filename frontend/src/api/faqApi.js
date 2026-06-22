@@ -339,4 +339,6 @@ export async function createAnswerTranslation(answerId, payload) {
     method: "POST",
     body: JSON.stringify(payload),
   });
+export async function fetchContributorLeaderboard() {
+  return request("/contributors/leaderboard");
 }
