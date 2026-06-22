@@ -11,6 +11,7 @@ import Signup from "./pages/Signup";
 import Landing from "./pages/Landing";
 import Subscription from "./pages/Subscription";
 import Admin from "./pages/Admin";
+import HelpCenter from "./pages/HelpCenter";
 import ChatWidget from "./components/ChatWidget";
 
 function App() {
@@ -29,6 +30,7 @@ function App() {
         <Route path="/signup" element={<Signup />} />
         <Route path="/subscription" element={<Subscription/>} />
         <Route path="/admin" element={<Admin />} />
+        <Route path="/help" element={<HelpCenter />} />
       </Routes>
       <ChatWidget />
     </>

@@ -13,8 +13,10 @@ import {
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
 import AskQuestionModal from "../components/AskQuestionModal";
+import LogoutModal from "../components/LogoutModal";
 
-export default function Admin() {
+function Admin() {
+  const [showLogout, setShowLogout] = useState(false);
   const [activeTab, setActiveTab] = useState("Overview");
   const [overview, setOverview] = useState(null);
   const [pendingQueries, setPendingQueries] = useState([]);
@@ -177,9 +179,9 @@ export default function Admin() {
 
   return (
     <>
-      <Sidebar />
+      <Sidebar onLogout={() => setShowLogout(true)} />
       <div className="main-wrapper">
-        <Topbar openModal={() => setShowModal(true)} />
+        <Topbar openModal={() => setShowModal(true)} onLogout={() => setShowLogout(true)} />
         
         <main className="content">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
@@ -563,6 +565,9 @@ export default function Admin() {
       </div>
 
       <AskQuestionModal open={showModal} onClose={() => setShowModal(false)} />
+      <LogoutModal open={showLogout} onClose={() => setShowLogout(false)} />
     </>
   );
 }
+
+export default Admin;

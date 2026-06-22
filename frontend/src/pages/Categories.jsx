@@ -4,9 +4,11 @@ import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
 import AskQuestionModal from "../components/AskQuestionModal";
 import { useFAQ } from "../context/FAQContext";
+import LogoutModal from "../components/LogoutModal";
 
 function Categories() {
   const [showModal, setShowModal] = useState(false);
+  const [showLogout, setShowLogout] = useState(false);
   const { categories, questions } = useFAQ();
 
   const getCategoryColor = (categoryName) => {
@@ -32,9 +34,9 @@ function Categories() {
 
   return (
     <>
-      <Sidebar />
+      <Sidebar onLogout={() => setShowLogout(true)} />
       <div className="main-wrapper">
-        <Topbar openModal={() => setShowModal(true)} />
+        <Topbar openModal={() => setShowModal(true)} onLogout={() => setShowLogout(true)} />
         <main className="content">
           <h1 className="page-title">Categories</h1>
           <p className="page-subtitle">Browse questions by topic area</p>
@@ -80,6 +82,7 @@ function Categories() {
         </main>
       </div>
       <AskQuestionModal open={showModal} onClose={() => setShowModal(false)} />
+      <LogoutModal open={showLogout} onClose={() => setShowLogout(false)} />
     </>
   );
 }

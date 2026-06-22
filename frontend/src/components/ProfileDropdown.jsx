@@ -53,7 +53,7 @@ const LogOutIcon = () => (
   </svg>
 );
 
-function ProfileDropdown({ isOpen, onClose }) {
+function ProfileDropdown({ isOpen, onClose, onLogout }) {
   const { contributors } = useFAQ();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -160,7 +160,7 @@ function ProfileDropdown({ isOpen, onClose }) {
         </li>
         <li className="dropdown-divider"></li>
         <li>
-          <a href="#logout" className="logout-btn" onClick={(e) => { e.preventDefault(); logout(); navigate("/"); onClose(); }}>
+          <a href="#logout" className="logout-btn" onClick={(e) => { e.preventDefault(); if (onLogout) { onLogout(); } else { logout(); navigate("/"); } onClose(); }}>
             <LogOutIcon />
             <span>Sign Out</span>
           </a>

@@ -1,11 +1,15 @@
+import { useState } from "react";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
+import LogoutModal from "../components/LogoutModal";
+
 function Subscription() {
+  const [showLogout, setShowLogout] = useState(false);
   return (
     <>
-    <Sidebar />
+    <Sidebar onLogout={() => setShowLogout(true)} />
 <div className="main-wrapper">
-    <Topbar />
+    <Topbar onLogout={() => setShowLogout(true)} />
     <main className="content">
         <div className="hero">
             <h1>My Subscriptions</h1>
@@ -223,6 +227,7 @@ function Subscription() {
 </section>
       </main>
     </div>
+      <LogoutModal open={showLogout} onClose={() => setShowLogout(false)} />
     </>
   );
 }

@@ -8,6 +8,7 @@ import { useFAQ } from "../context/FAQContext";
 import { useAuth } from "../context/AuthContext";
 import { deleteFaq, deleteQuery, deleteAnswer, followResource, unfollowResource, muteFollow, fetchAnswers, fetchFaqTranslations, createFaqTranslation, createBounty, awardBounty, fetchBounties } from "../api/faqApi";
 import ErrorToast from "../components/ErrorToast";
+import LogoutModal from "../components/LogoutModal";
 
 const defaultQuestion = {
   title: "Question Not Found",
@@ -27,6 +28,7 @@ function QuestionDetail() {
   const { questions, upvoteQuestion, bookmarkQuestion, addAnswer, upvoteAnswer } = useFAQ();
   const { id } = useParams();
   const [showModal, setShowModal] = useState(false);
+  const [showLogout, setShowLogout] = useState(false);
   const [replyText, setReplyText] = useState("");
   const [summary, setSummary] = useState("");
   const [summaryLoading, setSummaryLoading] = useState(false);
@@ -333,9 +335,9 @@ function QuestionDetail() {
 
   return (
     <>
-      <Sidebar />
+      <Sidebar onLogout={() => setShowLogout(true)} />
       <div className="main-wrapper">
-        <Topbar openModal={() => setShowModal(true)} />
+        <Topbar openModal={() => setShowModal(true)} onLogout={() => setShowLogout(true)} />
         <main className="content">
           <ErrorToast message={error} onClose={() => setError("")} />
           <Link to="/questions" className="back-link">← Back to Questions</Link>
@@ -770,6 +772,7 @@ function QuestionDetail() {
         </main>
       </div>
       <AskQuestionModal open={showModal} onClose={() => setShowModal(false)} />
+      <LogoutModal open={showLogout} onClose={() => setShowLogout(false)} />
     </>
   );
 }
