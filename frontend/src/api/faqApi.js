@@ -1,5 +1,5 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
-const API_TIMEOUT_MS = 10000;
+const API_TIMEOUT_MS = 30000; // 30s — translations via Gemini can be slow
 const MAX_RETRIES = 2;
 
 function sleep(ms) {
@@ -23,7 +23,15 @@ async function request(path, options = {}, attempt = 0) {
     });
 
     const text = await response.text();
-    const payload = text ? JSON.parse(text) : {};
+    let payload = {};
+    try {
+      payload = text ? JSON.parse(text) : {};
+    } catch (_) {
+      // Server returned non-JSON (e.g. plain-text rate limit message)
+      if (!response.ok) {
+        throw new Error(`${response.status} ${response.statusText}: ${text.substring(0, 100)}`);
+      }
+    }
 
     if (!response.ok) {
       throw new Error(payload.message || payload.error || `Request failed: ${response.status}`);
@@ -31,8 +39,12 @@ async function request(path, options = {}, attempt = 0) {
 
     return payload;
   } catch (error) {
+    // AbortError = timeout or intentional cancel — do NOT retry, it will just abort again
+    if (error.name === "AbortError") {
+      throw new Error("Request timed out. Please try again.");
+    }
+
     const retryable =
-      error.name === "AbortError" ||
       error.message.includes("Failed to fetch") ||
       error.message.includes("NetworkError");
 
@@ -225,6 +237,10 @@ export async function createFaqTranslation(faqId, payload) {
 
 export async function fetchFaqTranslations(faqId) {
   return request(`/faqs/${faqId}/translations`);
+}
+
+export async function fetchFaqById(faqId) {
+  return request(`/faqs/${faqId}`);
 }
 
 export async function createBounty(payload) {

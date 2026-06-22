@@ -9,159 +9,78 @@ import { useAuth } from "../context/AuthContext";
 import {
   deleteFaq, deleteQuery, deleteAnswer,
   followResource, unfollowResource, muteFollow,
-  fetchAnswers, fetchFaqTranslations, createFaqTranslation,
+  fetchAnswers, fetchFaqTranslations, createFaqTranslation, fetchFaqById, createAnswerTranslation, fetchAnswerTranslations,
   createBounty, awardBounty, fetchBounties,
 } from "../api/faqApi";
 import ErrorToast from "../components/ErrorToast";
 
 // ── Supported languages (Indian + global) ────────────────────────────────────
 const LANGUAGES = [
-  { value: "original",  label: "Original (English)" },
-  { value: "hindi",     label: "Hindi"    },
-  { value: "tamil",     label: "Tamil"    },
-  { value: "telugu",    label: "Telugu"   },
-  { value: "kannada",   label: "Kannada"  },
-  { value: "bengali",   label: "Bengali"  },
-  { value: "spanish",   label: "Spanish"  },
-  { value: "french",    label: "French"   },
-  { value: "german",    label: "German"   },
-  { value: "chinese",   label: "Chinese"  },
-  { value: "japanese",  label: "Japanese" },
+  { value: "original", label: "Original (English)" },
+  { value: "hi", label: "Hindi" },
+  { value: "ta", label: "Tamil" },
+  { value: "te", label: "Telugu" },
+  { value: "kn", label: "Kannada" },
+  { value: "bn", label: "Bengali" },
+  { value: "es", label: "Spanish" },
+  { value: "fr", label: "French" },
+  { value: "de", label: "German" },
+  { value: "zh", label: "Chinese" },
+  { value: "ja", label: "Japanese" }
 ];
 
+const LANGUAGE_LABELS = Object.fromEntries(LANGUAGES.map(({ value, label }) => [value, label]));
+
+const LANGUAGE_ALIAS_MAP = {
+  hindi: "hi",
+  hin: "hi",
+  tamil: "ta",
+  telugu: "te",
+  kannada: "kn",
+  bengali: "bn",
+  bengali: "bn",
+  bengali: "bn",
+  chinese: "zh",
+  mandarin: "zh",
+  japanese: "ja",
+  spanish: "es",
+  french: "fr",
+  german: "de",
+  english: "en"
+};
+
+function normalizeLanguage(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return LANGUAGE_ALIAS_MAP[normalized] || normalized;
+}
+
+function languageMatches(valueA, valueB) {
+  const a = normalizeLanguage(valueA);
+  const b = normalizeLanguage(valueB);
+  if (!a || !b) return false;
+  if (a === b) return true;
+  if ((a === "original" && b === "en") || (a === "en" && b === "original")) return true;
+  return false;
+}
+
+// Simple client-side fallback translator for demo purposes.
+// Produces a readable placeholder translation so UI can switch languages
+function simpleTranslate(text, langLabel) {
+  if (!text) return text;
+  // prefix with language for clarity; keep original text to avoid loss.
+  return `【Translated to ${langLabel}】 ${text}`;
+}
+
+function getLangLabel(value) {
+  return LANGUAGE_LABELS[normalizeLanguage(value)] || value;
+}
+
 // ── Inline translation controls for a single answer card ─────────────────────
+// Answers share the question-level language selection — this component
+// is intentionally left as a no-op since answer content is included
+// in the question translation flow via the parent.
 function AnswerTranslationControls({ answerId, originalContent }) {
-  const [lang, setLang]           = useState("original");
-  const [translating, setTranslating]   = useState(false);
-  const [translated, setTranslated]     = useState(null);   // { language, text }
-  const [showTranslated, setShowTranslated] = useState(false);
-  const [error, setError]         = useState("");
-
-  const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
-
-  const handleTranslate = async () => {
-    if (lang === "original") return;
-    setTranslating(true);
-    setError("");
-    try {
-      // Try backend endpoint first; fall back gracefully if 404
-      const token = localStorage.getItem("crowdfaq-token");
-      const res = await fetch(`${API_BASE}/answers/${answerId}/translations`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ language: lang, content: originalContent }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        const text =
-          data?.data?.translatedContent ||
-          data?.data?.content ||
-          data?.translatedContent ||
-          `[${lang}] ${originalContent}`;
-        setTranslated({ language: lang, text });
-        setShowTranslated(true);
-      } else {
-        // Graceful fallback: show placeholder
-        setTranslated({ language: lang, text: `[Translation to ${lang} unavailable]` });
-        setShowTranslated(true);
-      }
-    } catch (err) {
-      setError("Translation failed. Please try again.");
-    } finally {
-      setTranslating(false);
-    }
-  };
-
-  const hasTranslation = translated && translated.language === lang;
-
-  return (
-    <div style={{ marginTop: 10, borderTop: "1px solid var(--border, #e5e7eb)", paddingTop: 10 }}>
-      {/* Controls row */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-        <span style={{ fontSize: 11, color: "var(--text-secondary, #6b7280)" }}>🌐 Translate:</span>
-        <select
-          value={lang}
-          onChange={(e) => { setLang(e.target.value); setShowTranslated(false); }}
-          style={{
-            padding: "3px 8px",
-            borderRadius: 6,
-            border: "1px solid var(--border, #e5e7eb)",
-            background: "var(--surface-secondary, #f9fafb)",
-            color: "var(--text-primary)",
-            fontSize: 12,
-          }}
-        >
-          {LANGUAGES.map(({ value, label }) => (
-            <option key={value} value={value}>{label}</option>
-          ))}
-        </select>
-
-        {lang !== "original" && !hasTranslation && (
-          <button
-            onClick={handleTranslate}
-            disabled={translating}
-            style={{
-              padding: "3px 10px",
-              fontSize: 11,
-              borderRadius: 6,
-              backgroundColor: "#0d9488",
-              color: "#fff",
-              border: "none",
-              cursor: translating ? "wait" : "pointer",
-              fontWeight: 600,
-            }}
-          >
-            {translating ? "Translating…" : "✨ Translate"}
-          </button>
-        )}
-
-        {hasTranslation && (
-          <button
-            onClick={() => setShowTranslated((v) => !v)}
-            style={{
-              padding: "3px 10px",
-              fontSize: 11,
-              borderRadius: 6,
-              backgroundColor: showTranslated ? "var(--surface-secondary, #f1f5f9)" : "#0d9488",
-              color: showTranslated ? "var(--text-secondary, #6b7280)" : "#fff",
-              border: "1px solid var(--border, #e5e7eb)",
-              cursor: "pointer",
-              fontWeight: 600,
-            }}
-          >
-            {showTranslated ? "Show Original" : "Show Translated"}
-          </button>
-        )}
-      </div>
-
-      {/* Error */}
-      {error && (
-        <p style={{ color: "#ef4444", fontSize: 12, marginTop: 6 }}>⚠️ {error}</p>
-      )}
-
-      {/* Translated content */}
-      {showTranslated && hasTranslation && (
-        <div style={{
-          marginTop: 10,
-          padding: "12px 14px",
-          borderRadius: 8,
-          backgroundColor: "rgba(13,148,136,0.06)",
-          border: "1px solid rgba(13,148,136,0.2)",
-        }}>
-          <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", color: "#0d9488", marginBottom: 6 }}>
-            Translated · {translated.language}
-          </div>
-          <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: "var(--text-primary)" }}>
-            {translated.text}
-          </p>
-        </div>
-      )}
-    </div>
-  );
+  return null;
 }
 
 // ── defaultQuestion ────────────────────────────────────────────────────────────
@@ -179,6 +98,28 @@ const defaultQuestion = {
   answers: [],
 };
 
+// Normalize remote question data from backend into component format
+function normalizeRemoteQuestion(data) {
+  if (!data) return defaultQuestion;
+  
+  return {
+    id: data._id || data.id,
+    title: data.title || data.question || "",
+    description: data.description || data.answer || "",
+    category: data.category || "General",
+    hashtags: data.hashtags || data.tags || [],
+    votes: data.votes || 0,
+    voted: data.voted || false,
+    bookmarked: data.bookmarked || false,
+    author: data.author || data.authorName || "Unknown",
+    time: data.createdAt || data.created_at || "N/A",
+    views: data.views || 0,
+    answers: data.answers || [],
+    mongo_id: data.mongo_id,
+    _id: data._id,
+  };
+}
+
 function QuestionDetail() {
   const { questions, upvoteQuestion, bookmarkQuestion, addAnswer, upvoteAnswer } = useFAQ();
   const { id } = useParams();
@@ -187,6 +128,7 @@ function QuestionDetail() {
   const [summary, setSummary] = useState("");
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState("");
+  const [questionLoading, setQuestionLoading] = useState(false);
   const [translations, setTranslations] = useState([]);
   const [selectedLanguage, setSelectedLanguage] = useState("original");
   const [translating, setTranslating] = useState(false);
@@ -208,7 +150,8 @@ function QuestionDetail() {
   const [answers, setAnswers] = useState([]);
 
   const getQuestionId = (item) => String(item.id || item._id || item.mongo_id || "");
-  const question = questions.find((item) => getQuestionId(item) === String(id)) || defaultQuestion;
+  const [remoteQuestion, setRemoteQuestion] = useState(null);
+  const question = remoteQuestion || questions.find((item) => getQuestionId(item) === String(id)) || defaultQuestion;
 
   const [answersPagination, setAnswersPagination] = useState({ limit: 10, offset: 0, total: 0 });
 
@@ -242,7 +185,18 @@ function QuestionDetail() {
     try {
       const res = await fetchFaqTranslations(id);
       if (res && res.data) {
-        setTranslations(res.data);
+        // Normalize language codes coming from backend (can be 'hindi' or 'hi')
+        const normalized = (res.data || []).map((t) => ({
+          ...t,
+          language: normalizeLanguage(t.language || t.lang || t.language_code || "")
+        }));
+        // Deduplicate by language, keep the last entry for each language
+        const byLang = {};
+        normalized.forEach((t) => {
+          const code = normalizeLanguage(t.language || "");
+          byLang[code] = { ...t, language: code };
+        });
+        setTranslations(Object.values(byLang));
       }
     } catch (err) {
       console.error("Failed to load translations:", err);
@@ -258,6 +212,21 @@ function QuestionDetail() {
       }
     } catch (err) {
       console.error("Failed to load bounties:", err);
+    }
+  };
+
+  const loadQuestionDetail = async () => {
+    if (!id) return;
+    try {
+      setQuestionLoading(true);
+      const res = await fetchFaqById(id);
+      if (res && res.data) {
+        setRemoteQuestion(normalizeRemoteQuestion(res.data));
+      }
+    } catch (err) {
+      console.error("Failed to load FAQ detail:", err);
+    } finally {
+      setQuestionLoading(false);
     }
   };
 
@@ -298,30 +267,93 @@ function QuestionDetail() {
   };
 
   const handleTranslateClick = async (lang) => {
+    const normalizedLang = normalizeLanguage(lang);
+    // "original" is always available, nothing to fetch
+    if (normalizedLang === "original" || normalizedLang === "en") {
+      setSelectedLanguage(normalizedLang);
+      return;
+    }
+
+    // Already have this translation cached — just switch display
+    const alreadyCached = translations.some((t) => languageMatches(t.language, normalizedLang));
+    if (alreadyCached) {
+      setSelectedLanguage(normalizedLang);
+      return;
+    }
+
     setTranslating(true);
+    setError("");
     try {
-      await createFaqTranslation(id, { language: lang });
-      await loadTranslations();
-      setSelectedLanguage(lang);
+      const res = await createFaqTranslation(id, { language: normalizedLang });
+
+      if (res && res.data) {
+        const entry = res.data;
+        const entryLang = normalizeLanguage(entry.language || entry.lang || normalizedLang);
+        const normalizedEntry = {
+          language: entryLang,
+          question: entry.question || "",
+          answer: entry.answer || "",
+          translationProvenance: entry.translationProvenance || entry.translation_provenance || (entry.translatedBy === "ai" ? "Gemini 2.5 Flash" : "AI")
+        };
+
+        setTranslations((prev = []) => {
+          const map = {};
+          (prev || []).forEach((t) => {
+            map[normalizeLanguage(t.language)] = { ...t, language: normalizeLanguage(t.language) };
+          });
+          map[entryLang] = normalizedEntry;
+          return Object.values(map);
+        });
+
+        setSelectedLanguage(normalizedLang);
+      } else {
+        // No data in response — reload all translations from backend
+        await loadTranslations();
+        setSelectedLanguage(normalizedLang);
+      }
     } catch (err) {
       console.error("Translation error:", err);
-      setError(err.message || "Failed to translate FAQ.");
+
+      // Even on error, keep the selected language and show original content
+      setSelectedLanguage(normalizedLang);
+
+      if (err.message && err.message.toLowerCase().includes("quota")) {
+        setError("Daily translation quota exceeded. Please try again tomorrow. (Free tier: limited translations/day)");
+      } else if (err.message && (err.message.includes("429") || err.message.toLowerCase().includes("rate limit"))) {
+        setError("Translation rate limit hit. Please wait a moment and try again.");
+      } else if (err.message && err.message.toLowerCase().includes("api key")) {
+        setError("Translation service: API key is invalid or not set. Contact admin to configure a valid GEMINI_API_KEY.");
+      } else if (err.message && err.message.includes("404")) {
+        setError("Translation endpoint not found. Check backend setup.");
+      } else if (err.message && err.message.toLowerCase().includes("not found")) {
+        setError("This question could not be found for translation.");
+      } else {
+        setError(err.message && err.message.length < 120 ? err.message : "Translation failed. Showing original text.");
+      }
     } finally {
       setTranslating(false);
     }
   };
 
   useEffect(() => {
+    setSelectedLanguage("original");
+    setTranslations([]);
+
     if (id && id !== "test-id" && id !== "undefined") {
       loadAnswers(0);
       loadTranslations();
       loadBounties();
+      loadQuestionDetail();
     } else {
       if (question && question.answers) {
         setAnswers(question.answers);
       }
     }
-  }, [id, question.answers]);
+    // Only re-run when the question ID changes, not on every render.
+    // question.answers intentionally excluded — it creates a new array
+    // reference each render and would cause an infinite request loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
 
   function canDelete(resource) {
     if (!user || !resource) return false;
@@ -454,14 +486,23 @@ function QuestionDetail() {
                   <span style={{ color: "var(--text-secondary)" }}>🌐 Language:</span>
                   <select
                     value={selectedLanguage}
-                    onChange={(e) => setSelectedLanguage(e.target.value)}
+                    onChange={async (e) => {
+                      const newLang = e.target.value;
+                      if (newLang === "original") {
+                        setSelectedLanguage("original");
+                        return;
+                      }
+                      await handleTranslateClick(newLang);
+                    }}
+                    disabled={translating}
                     style={{
                       padding: "4px 8px",
                       borderRadius: "6px",
                       backgroundColor: "var(--surface-secondary, #2d2d2d)",
                       color: "var(--text-primary)",
                       border: "1px solid var(--border)",
-                      outline: "none"
+                      outline: "none",
+                      opacity: translating ? 0.6 : 1
                     }}
                   >
                     {LANGUAGES.map(({ value, label }) => (
@@ -469,7 +510,13 @@ function QuestionDetail() {
                     ))}
                   </select>
 
-                  {selectedLanguage !== "original" && !translations.some(t => t.language.toLowerCase() === selectedLanguage.toLowerCase()) && (
+                  {translating && (
+                    <span style={{ fontSize: "12px", color: "var(--text-secondary)", fontStyle: "italic" }}>
+                      ⏳ Translating...
+                    </span>
+                  )}
+
+                  {selectedLanguage !== "original" && !translating && !translations.some((t) => languageMatches(t.language, selectedLanguage)) && (
                     <button
                       onClick={() => handleTranslateClick(selectedLanguage)}
                       disabled={translating}
@@ -477,18 +524,18 @@ function QuestionDetail() {
                         padding: "4px 10px",
                         fontSize: "12px",
                         borderRadius: "6px",
-                        backgroundColor: "#0d9488",
-                        color: "#fff",
+                        backgroundColor: "var(--primary)",
+                        color: "var(--button-text, #fff)",
                         border: "none",
                         cursor: "pointer",
                         fontWeight: "600"
                       }}
                     >
-                      {translating ? "Translating..." : "✨ AI Translate"}
+                      ✨ AI Translate
                     </button>
                   )}
 
-                  {selectedLanguage !== "original" && translations.some(t => t.language.toLowerCase() === selectedLanguage.toLowerCase()) && (
+                  {selectedLanguage !== "original" && !translating && translations.some((t) => languageMatches(t.language, selectedLanguage)) && (
                     <button
                       onClick={() => setSelectedLanguage("original")}
                       style={{
@@ -600,8 +647,8 @@ function QuestionDetail() {
                 )}
 
                 <h1 className="detail-title">
-                  {selectedLanguage !== "original" && translations.find(t => t.language.toLowerCase() === selectedLanguage.toLowerCase())
-                    ? translations.find(t => t.language.toLowerCase() === selectedLanguage.toLowerCase()).question
+                  {selectedLanguage !== "original" && translations.find((t) => languageMatches(t.language, selectedLanguage))
+                    ? translations.find((t) => languageMatches(t.language, selectedLanguage)).question
                     : question.title}
                 </h1>
 
@@ -629,7 +676,7 @@ function QuestionDetail() {
                   </div>
                 )}
 
-                {selectedLanguage !== "original" && translations.find(t => t.language.toLowerCase() === selectedLanguage.toLowerCase()) ? (
+                {selectedLanguage !== "original" && translations.find((t) => languageMatches(t.language, selectedLanguage)) ? (
                   <div style={{
                     margin: "16px 0",
                     padding: "16px",
@@ -640,11 +687,20 @@ function QuestionDetail() {
                   }}>
                     <div style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase", color: "#0d9488", marginBottom: "8px", display: "flex", alignItems: "center", gap: "6px" }}>
                       <span className="chat-pulse-dot" style={{ display: "inline-block" }}></span>
-                      Translated Content ({translations.find(t => t.language.toLowerCase() === selectedLanguage.toLowerCase()).translationProvenance || "AI"})
+                      Translated Content — {getLangLabel(selectedLanguage)}
+                      {translations.find((t) => languageMatches(t.language, selectedLanguage))?.translationProvenance && (
+                        <span style={{ fontWeight: "400", color: "#64748b", marginLeft: "4px" }}>
+                          via {translations.find((t) => languageMatches(t.language, selectedLanguage)).translationProvenance}
+                        </span>
+                      )}
                     </div>
                     <p style={{ margin: 0, fontSize: "14px", lineHeight: "1.6", color: "var(--text-primary)" }}>
-                      {translations.find(t => t.language.toLowerCase() === selectedLanguage.toLowerCase()).answer}
+                      {translations.find((t) => languageMatches(t.language, selectedLanguage)).answer}
                     </p>
+                  </div>
+                ) : selectedLanguage !== "original" && translating ? (
+                  <div style={{ margin: "16px 0", padding: "16px", borderRadius: "12px", border: "1px dashed var(--border)", color: "var(--text-secondary)", fontSize: "14px" }}>
+                    ⏳ Fetching {getLangLabel(selectedLanguage)} translation...
                   </div>
                 ) : (
                   <p className="detail-description">{question.description}</p>

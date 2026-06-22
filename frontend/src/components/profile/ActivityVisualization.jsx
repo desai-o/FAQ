@@ -9,11 +9,12 @@ function ContributionHeatmap({ heatmapData }) {
   const slots = ["12 AM", "4 AM", "8 AM", "12 PM", "4 PM", "8 PM"];
 
   const getColor = (interactions) => {
-    if (!interactions || interactions === 0) return "var(--border, #e5e7eb)";
-    if (interactions <= 1) return "#bbf7d0";
-    if (interactions <= 3) return "#4ade80";
-    if (interactions <= 6) return "#16a34a";
-    return "#14532d";
+    const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+    if (!interactions || interactions === 0) return isDark ? "#2e2e2e" : "var(--border, #e5e7eb)";
+    if (interactions <= 1) return isDark ? "#14532d" : "#bbf7d0";
+    if (interactions <= 3) return isDark ? "#166534" : "#4ade80";
+    if (interactions <= 6) return isDark ? "#16a34a" : "#16a34a";
+    return isDark ? "#4ade80" : "#14532d";
   };
 
   return (
@@ -76,9 +77,15 @@ function ContributionHeatmap({ heatmapData }) {
 
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8, fontSize: 11, color: "var(--text-secondary, #6b7280)" }}>
         <span>Less</span>
-        {["var(--border, #e5e7eb)", "#bbf7d0", "#4ade80", "#16a34a", "#14532d"].map((color) => (
-          <div key={color} style={{ width: 14, height: 14, borderRadius: 3, backgroundColor: color }} />
-        ))}
+        {(() => {
+          const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+          const colors = isDark
+            ? ["#2e2e2e", "#14532d", "#166534", "#16a34a", "#4ade80"]
+            : ["var(--border, #e5e7eb)", "#bbf7d0", "#4ade80", "#16a34a", "#14532d"];
+          return colors.map((color) => (
+            <div key={color} style={{ width: 14, height: 14, borderRadius: 3, backgroundColor: color }} />
+          ));
+        })()}
         <span>More</span>
       </div>
     </div>
@@ -193,7 +200,7 @@ function SummaryCards({ stats }) {
           style={{
             padding: "14px 16px",
             borderRadius: 10,
-            background: "var(--card-bg, #ffffff)",
+            background: "var(--bg-white)",
             border: "1px solid var(--border, #e5e7eb)",
             display: "flex",
             flexDirection: "column",

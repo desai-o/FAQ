@@ -10,7 +10,7 @@ const { extractKeywords } = require("../services/syncService");
 const { autoFollow } = require("../services/followService");
 const { dispatchNotification } = require("../services/notificationService");
 const { inferCategory, normalizeTags } = require("../services/categoryService");
-const { requireAuth, requireRole } = require("../middleware/auth");
+const { optionalAuth, requireAuth, requireRole } = require("../middleware/auth");
 const { canDeleteResource } = require("../middleware/ownership");
 const { adjustUserStats } = require("../services/badgeService");
 const { saveFaqRevision, getFaqRevisions, rollbackFaq } = require("../services/revisionService");
@@ -667,8 +667,56 @@ router.post("/generate-thread", requireAuth, writeLimiter, validate(generateThre
 
 // Translation routes
 
+// GET /api/faqs/:id
+router.get("/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (isMongoAvailable()) {
+      const faq = (await FAQ.findById(id)) || (await FAQ.findOne({ $or: [{ _id: id }, { mongo_id: id }] }));
+      if (faq) {
+        return success(res, {
+          storage: "mongodb",
+          data: faq
+        });
+      }
+    }
+
+    const db = getSQLiteDb();
+    const faq = await db.get("SELECT * FROM faqs WHERE id = ? OR mongo_id = ?", id, id);
+
+    if (!faq) {
+      return fail(res, {
+        statusCode: 404,
+        code: "FAQ_NOT_FOUND",
+        message: "FAQ not found"
+      });
+    }
+
+    return success(res, {
+      storage: "sqlite",
+      data: {
+        ...faq,
+        id: String(faq.id),
+        question: faq.question,
+        answer: faq.answer,
+        authorName: faq.author_name,
+        createdAt: faq.created_at,
+        updatedAt: faq.updated_at
+      }
+    });
+  } catch (error) {
+    return fail(res, {
+      statusCode: 500,
+      code: "FAQ_FETCH_FAILED",
+      message: "Failed to fetch FAQ",
+      details: error.message
+    });
+  }
+});
+
 // POST /api/faqs/:id/translations
-router.post("/:id/translations", requireAuth, writeLimiter, async (req, res) => {
+router.post("/:id/translations", optionalAuth, writeLimiter, async (req, res) => {
   try {
     const { id } = req.params;
     const { language, question, answer } = req.body;
@@ -681,13 +729,13 @@ router.post("/:id/translations", requireAuth, writeLimiter, async (req, res) => 
       });
     }
 
-    const { addFAQTranslation } = require("../services/translationService");
+    const { addFAQTranslation, normalizeLanguageCode } = require("../services/translationService");
     const result = await addFAQTranslation({
       faqId: id,
-      language: language.trim(),
+      language: normalizeLanguageCode(language),
       question: question ? question.trim() : undefined,
       answer: answer ? answer.trim() : undefined,
-      userId: req.user.id
+      userId: req.user?.id || "anonymous"
     });
 
     return success(res, {
@@ -695,6 +743,21 @@ router.post("/:id/translations", requireAuth, writeLimiter, async (req, res) => 
       data: result
     });
   } catch (error) {
+    // Distinguish rate-limit errors from other failures
+    if (error.message && error.message.startsWith("RATE_LIMIT:")) {
+      return fail(res, {
+        statusCode: 429,
+        code: "TRANSLATION_RATE_LIMITED",
+        message: error.message.replace("RATE_LIMIT: ", "")
+      });
+    }
+    if (error.message && error.message.startsWith("FAQ not found")) {
+      return fail(res, {
+        statusCode: 404,
+        code: "FAQ_NOT_FOUND",
+        message: error.message
+      });
+    }
     return fail(res, {
       statusCode: 500,
       code: "FAQ_TRANSLATION_FAILED",
@@ -711,11 +774,18 @@ router.get("/:id/translations", async (req, res) => {
 
     if (isMongoAvailable()) {
       const FAQTranslation = require("../models/FAQTranslation");
-      const translations = await FAQTranslation.find({ faqId: id });
-      return success(res, {
-        storage: "mongodb",
-        data: translations
-      });
+      try {
+        const translations = await FAQTranslation.find({ faqId: id });
+        if (translations && translations.length > 0) {
+          return success(res, {
+            storage: "mongodb",
+            data: translations
+          });
+        }
+      } catch (mongoErr) {
+        // faqId may not be a valid ObjectId — fall through to SQLite
+        console.warn("[TranslationRoute] MongoDB find failed, falling back to SQLite:", mongoErr.message);
+      }
     }
 
     const db = getSQLiteDb();

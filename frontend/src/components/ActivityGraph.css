@@ -14,8 +14,8 @@
   box-sizing: border-box;
 }
 [data-theme="dark"] .graph-card {
-  background: #000000;
-  border-color: #222222;
+  background: var(--bg-white, #242424);
+  border-color: var(--border, #2e2e2e);
 }
 
 .graph-header {
@@ -73,6 +73,7 @@
 }
 
 [data-theme="dark"] .graph-tab-btn.active.tab-questions {
+  background: var(--bg-hover, #2e2e2e);
   color: #9ca3af;
   box-shadow: 0 2px 8px rgba(156, 163, 175, 0.3);
 }
@@ -84,6 +85,7 @@
 }
 
 [data-theme="dark"] .graph-tab-btn.active.tab-answers {
+  background: var(--bg-hover, #2e2e2e);
   color: #4ade80;
   box-shadow: 0 2px 8px rgba(74, 222, 128, 0.2);
 }
@@ -95,6 +97,7 @@
 }
 
 [data-theme="dark"] .graph-tab-btn.active.tab-upvotes {
+  background: var(--bg-hover, #2e2e2e);
   color: #60a5fa;
   box-shadow: 0 2px 8px rgba(96, 165, 250, 0.2);
 }

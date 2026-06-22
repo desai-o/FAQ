@@ -186,6 +186,12 @@
 .heatmap-cell-lvl-3 { background-color: #4f93ff; }
 .heatmap-cell-lvl-4 { background-color: #2832c2; }
 
+[data-theme="dark"] .heatmap-cell-lvl-0 { background-color: #1e2a3a; }
+[data-theme="dark"] .heatmap-cell-lvl-1 { background-color: #1e3a5f; }
+[data-theme="dark"] .heatmap-cell-lvl-2 { background-color: #1d4ed8; }
+[data-theme="dark"] .heatmap-cell-lvl-3 { background-color: #2563eb; }
+[data-theme="dark"] .heatmap-cell-lvl-4 { background-color: #60a5fa; }
+
 /* Hover highlight */
 .heatmap-cell:hover {
   transform: scale(1.08);
@@ -289,8 +295,8 @@
    ========================= */
 
 [data-theme="dark"] .heatmap-card {
-  background: #000000;
-  border-color: #222222;
+  background: var(--bg-white, #242424);
+  border-color: var(--border, #2e2e2e);
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
 }
 
@@ -325,8 +331,8 @@
 }
 
 [data-theme="dark"] .heatmap-dropdown-list {
-  background: #111111;
-  border-color: #222222;
+  background: var(--bg-white, #242424);
+  border-color: var(--border, #2e2e2e);
 }
 
 [data-theme="dark"] .heatmap-dropdown-item {
@@ -345,8 +351,8 @@
 
 /* Tooltip */
 [data-theme="dark"] .heatmap-tooltip {
-  background: #111111;
-  border-color: #222222;
+  background: var(--bg-white, #242424);
+  border-color: var(--border, #2e2e2e);
 }
 
 [data-theme="dark"] .heatmap-tooltip-time {

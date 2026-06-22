@@ -57,9 +57,16 @@ app.use(
 app.use(
   rateLimit({
     windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS || 900000),
-    max: Number(process.env.RATE_LIMIT_MAX || 300),
+    max: Number(process.env.RATE_LIMIT_MAX || 2000),
     standardHeaders: true,
-    legacyHeaders: false
+    legacyHeaders: false,
+    handler: (req, res) => {
+      res.status(429).json({
+        status: "error",
+        code: "TOO_MANY_REQUESTS",
+        message: "Too many requests, please try again later."
+      });
+    }
   })
 );
 
