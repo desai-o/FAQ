@@ -292,4 +292,8 @@ export async function queryGraphQL(query, variables = {}) {
   });
 }
 
+export async function fetchContributorLeaderboard() {
+  return request("/contributors/leaderboard");
+}
+
 
