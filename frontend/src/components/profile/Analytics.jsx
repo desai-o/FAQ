@@ -24,7 +24,7 @@ function Analytics() {
             <span className="analytics-change positive">{a.change}</span>
             <svg className="sparkline" viewBox="0 0 80 28" fill="none">
               <polyline points={a.points}
-                stroke="#2563EB" strokeWidth="1.5"
+                stroke="var(--accent-blue, #2563EB)" strokeWidth="1.5"
                 strokeLinecap="round" strokeLinejoin="round" fill="none"/>
             </svg>
           </div>

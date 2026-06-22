@@ -17,7 +17,7 @@ const { getPagination } = require("../utils/pagination");
 const { success, fail } = require("../utils/apiResponse");
 const { writeLimiter } = require("../middleware/rateLimits");
 const { adjustUserStats } = require("../services/badgeService");
-const { saveQueryRevision } = require("../services/revisionService");
+const { saveQueryRevision, getQueryRevisions } = require("../services/revisionService");
 const { createModerationRecord } = require("../services/moderationService");
 
 const createQuerySchema = z.object({
@@ -612,10 +612,116 @@ router.patch("/:id", requireAuth, writeLimiter, validate(updateQuerySchema), asy
   }
 });
 
+// Get single query by ID
+router.get("/:id", async (req, res) => {
+  try {
+    if (isMongoAvailable()) {
+      const query = await UserQuery.findById(req.params.id).catch(() => null);
+      if (query) {
+        return success(res, { storage: "mongodb", data: query });
+      }
+    }
+    const db = getSQLiteDb();
+    const query = await db.get("SELECT * FROM user_queries WHERE id = ? OR mongo_id = ?", req.params.id, req.params.id);
+    if (!query) {
+      return fail(res, { statusCode: 404, code: "QUERY_NOT_FOUND", message: "Query not found" });
+    }
+    return success(res, { storage: "sqlite", data: query });
+  } catch (error) {
+    return fail(res, { statusCode: 500, code: "QUERY_FETCH_FAILED", message: error.message });
+  }
+});
+
+// POST /api/queries/:id/translations
+router.post("/:id/translations", writeLimiter, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { language } = req.body;
+
+    if (!language || language.trim() === "") {
+      return fail(res, { statusCode: 400, code: "VALIDATION_ERROR", message: "Language is required" });
+    }
+
+    const { addFAQTranslation, normalizeLanguageCode } = require("../services/translationService");
+
+    // Resolve query text from MongoDB or SQLite
+    let queryText = null;
+    if (isMongoAvailable()) {
+      queryText = await UserQuery.findById(id).catch(() => null);
+    }
+    if (!queryText) {
+      const db = getSQLiteDb();
+      queryText = await db.get("SELECT question, description, answer FROM user_queries WHERE id = ? OR mongo_id = ?", id, id).catch(() => null);
+    }
+    if (!queryText) {
+      return fail(res, { statusCode: 404, code: "QUERY_NOT_FOUND", message: "Query not found" });
+    }
+
+    // Translate question + description as the "answer" field (queries may have no answer)
+    const sourceQuestion = queryText.question || "";
+    const sourceAnswer = queryText.description || queryText.answer || "";
+
+    const { translateContent } = require("../services/translationService");
+    const normalizedLang = normalizeLanguageCode(language);
+
+    const [qResult, aResult] = await Promise.all([
+      translateContent(sourceQuestion, normalizedLang),
+      sourceAnswer ? translateContent(sourceAnswer, normalizedLang) : Promise.resolve({ text: "", model: null, rateLimited: false })
+    ]);
+
+    if (qResult.rateLimited && !qResult.model) {
+      return fail(res, { statusCode: 429, code: "TRANSLATION_RATE_LIMITED", message: "Gemini API daily quota exceeded. Please try again later." });
+    }
+
+    const provenance = qResult.model ? `Gemini (${qResult.model})` : "AI Fallback";
+
+    // Store using faq_translations table with a query: prefix on faq_id to avoid collisions
+    const db = getSQLiteDb();
+    await db.run(
+      `INSERT INTO faq_translations (faq_id, language, question, answer, translated_by, translation_provenance)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT(faq_id, language) DO UPDATE SET question = excluded.question, answer = excluded.answer, translation_provenance = excluded.translation_provenance`,
+      `query:${id}`, normalizedLang, qResult.text, aResult.text, "ai", provenance
+    ).catch(() => {});
+
+    return success(res, {
+      statusCode: 201,
+      data: {
+        faqId: id,
+        language: normalizedLang,
+        question: qResult.text,
+        answer: aResult.text,
+        translatedBy: "ai",
+        translationProvenance: provenance
+      }
+    });
+  } catch (error) {
+    return fail(res, { statusCode: 500, code: "QUERY_TRANSLATION_FAILED", message: error.message });
+  }
+});
+
+// GET /api/queries/:id/translations
+router.get("/:id/translations", async (req, res) => {
+  try {
+    const db = getSQLiteDb();
+    const translations = await db.all("SELECT * FROM faq_translations WHERE faq_id = ?", `query:${req.params.id}`);
+    return success(res, {
+      storage: "sqlite",
+      data: translations.map(t => ({
+        ...t,
+        faqId: req.params.id,
+        translatedBy: t.translated_by,
+        translationProvenance: t.translation_provenance
+      }))
+    });
+  } catch (error) {
+    return fail(res, { statusCode: 500, code: "QUERY_TRANSLATION_FETCH_FAILED", message: error.message });
+  }
+});
+
 // Get query revisions
 router.get("/:id/revisions", async (req, res) => {
   try {
-    const { getQueryRevisions } = require("../services/revisionService");
     const revisions = await getQueryRevisions(req.params.id);
     return success(res, { data: revisions });
   } catch (error) {

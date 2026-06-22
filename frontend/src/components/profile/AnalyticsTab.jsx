@@ -68,6 +68,7 @@ function ViewsOverTimeChart() {
 
   useEffect(() => {
     if (chartRef.current) chartRef.current.destroy();
+    const isDark = document.documentElement.getAttribute("data-theme") === "dark";
 
     const labels = [
       "Apr 26","Apr 27","Apr 28","Apr 29","Apr 30",
@@ -90,7 +91,7 @@ function ViewsOverTimeChart() {
             borderWidth: 2,
             pointRadius: 3,
             pointBackgroundColor: "#2563EB",
-            pointBorderColor: "#fff",
+            pointBorderColor: isDark ? "#242424" : "#fff",
             pointBorderWidth: 1.5,
             tension: 0.35,
             fill: false,
@@ -103,7 +104,7 @@ function ViewsOverTimeChart() {
             borderWidth: 2,
             pointRadius: 3,
             pointBackgroundColor: "#16a34a",
-            pointBorderColor: "#fff",
+            pointBorderColor: isDark ? "#242424" : "#fff",
             pointBorderWidth: 1.5,
             tension: 0.35,
             fill: false,
@@ -116,7 +117,7 @@ function ViewsOverTimeChart() {
             borderWidth: 2,
             pointRadius: 3,
             pointBackgroundColor: "#D97706",
-            pointBorderColor: "#fff",
+            pointBorderColor: isDark ? "#242424" : "#fff",
             pointBorderWidth: 1.5,
             tension: 0.35,
             fill: false,
@@ -130,11 +131,11 @@ function ViewsOverTimeChart() {
         plugins: {
           legend: { display: false },
           tooltip: {
-            backgroundColor: "#fff",
-            borderColor: "#e2e8f0",
+            backgroundColor: isDark ? "#1a1a1a" : "#fff",
+            borderColor:     isDark ? "#333"    : "#e2e8f0",
             borderWidth: 1,
-            titleColor: "#0f172a",
-            bodyColor: "#64748b",
+            titleColor: isDark ? "#f0f0f0" : "#0f172a",
+            bodyColor:  isDark ? "#9ca3af" : "#64748b",
             padding: 10,
             boxPadding: 4,
           },
@@ -144,17 +145,17 @@ function ViewsOverTimeChart() {
             grid: { display: false },
             border: { display: false },
             ticks: {
-              color: "#94a3b8",
+              color: isDark ? "#6b7280" : "#94a3b8",
               font: { size: 11 },
               maxTicksLimit: 8,
               maxRotation: 0,
             },
           },
           y: {
-            grid: { color: "#f1f5f9" },
+            grid: { color: isDark ? "#2e2e2e" : "#f1f5f9" },
             border: { display: false },
             ticks: {
-              color: "#94a3b8",
+              color: isDark ? "#6b7280" : "#94a3b8",
               font: { size: 11 },
               callback: v => v >= 1000 ? v / 1000 + "K" : v,
               maxTicksLimit: 5,
@@ -168,6 +169,7 @@ function ViewsOverTimeChart() {
     return () => chartRef.current?.destroy();
   }, []);
 
+  const c = useThemeStyles();
   return (
     <div style={{ ...c.card, flex: 1, display:"flex", flexDirection:"column" }}>
       <div style={c.cardHead}>
@@ -176,7 +178,7 @@ function ViewsOverTimeChart() {
       </div>
       <div style={{ display: "flex", gap: 16, marginBottom: 12 }}>
         {[["#2563EB","Profile Views"],["#16a34a","FAQ Views"],["#D97706","Search Appearances"]].map(([color, label]) => (
-          <span key={label} style={{ display:"flex", alignItems:"center", gap:6, fontSize:12, color:"#6b7280" }}>
+          <span key={label} style={{ display:"flex", alignItems:"center", gap:6, fontSize:12, color:"var(--text-secondary, #6b7280)" }}>
             <span style={{ width:8, height:8, borderRadius:"50%", background:color, flexShrink:0 }} />
             {label}
           </span>
@@ -191,6 +193,10 @@ function ViewsOverTimeChart() {
 
 // ─── Analytics Overview only (for Overview tab) ───────────────────────────────
 export function AnalyticsOverview() {
+  const c = useThemeStyles();
+  const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+  const arrowColor = isDark ? "#4ade80" : "#16a34a";
+  const borderColor = isDark ? "var(--border, #2e303a)" : "#e5e7eb";
   return (
     <div style={c.card}>
       <div style={c.cardHead}>
@@ -199,11 +205,11 @@ export function AnalyticsOverview() {
       </div>
       <div style={c.overviewGrid}>
         {analyticsData.map((a, i) => (
-          <div key={a.label} style={{ ...c.overviewBox, borderRight: i < 3 ? "1px solid #e5e7eb" : "none" }}>
+          <div key={a.label} style={{ ...c.overviewBox, borderRight: i < 3 ? `1px solid ${borderColor}` : "none" }}>
             <span style={c.ovLabel}>{a.label}</span>
             <strong style={c.ovValue}>{a.value}</strong>
             <span style={c.ovChange}>
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#16a34a"
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke={arrowColor}
                 strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight:2 }}>
                 <polyline points="18 15 12 9 6 15" />
               </svg>
@@ -219,6 +225,11 @@ export function AnalyticsOverview() {
 
 // ─── Full Analytics Tab ───────────────────────────────────────────────────────
 export default function Analytics() {
+  const c = useThemeStyles();
+  const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+  const arrowColor = isDark ? "#4ade80" : "#16a34a";
+  const borderColor = isDark ? "var(--border, #2e303a)" : "#e5e7eb";
+
   return (
     <div style={c.layout}>
 
@@ -231,11 +242,11 @@ export default function Analytics() {
           </div>
           <div style={c.overviewGrid}>
             {analyticsData.map((a, i) => (
-              <div key={a.label} style={{ ...c.overviewBox, borderRight: i < 3 ? "1px solid #e5e7eb" : "none" }}>
+              <div key={a.label} style={{ ...c.overviewBox, borderRight: i < 3 ? `1px solid ${borderColor}` : "none" }}>
                 <span style={c.ovLabel}>{a.label}</span>
                 <strong style={c.ovValue}>{a.value}</strong>
                 <span style={c.ovChange}>
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#16a34a"
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke={arrowColor}
                     strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight:2 }}>
                     <polyline points="18 15 12 9 6 15" />
                   </svg>
@@ -251,153 +262,161 @@ export default function Analytics() {
       </div>
 
       {/* RIGHT */}
-    <div style={c.rightCol}>
+      <div style={c.rightCol}>
 
-      {/* Top FAQ */}
-      <div style={c.card}>
-        <div style={c.cardHead}>
-          <span style={c.cardTitle}>
-            Top FAQ <span style={{ fontWeight:400, color:"#6b7280", fontSize:13 }}>(by views)</span>
-          </span>
-          <button style={c.viewAll}>View all</button>
-        </div>
-        <div style={c.faqRow}>
-          <div style={c.faqIconBox}><IconFile /></div>
-          <div style={{ flex:1 }}>
-            <div style={{ fontSize:13, fontWeight:500, color:"#111827" }}>API Authentication Guide</div>
-            <div style={{ fontSize:11, color:"#6b7280", marginTop:2 }}>Your most viewed FAQ</div>
+        {/* Top FAQ */}
+        <div style={c.card}>
+          <div style={c.cardHead}>
+            <span style={c.cardTitle}>
+              Top FAQ <span style={{ fontWeight:400, color:"var(--text-secondary,#6b7280)", fontSize:13 }}>(by views)</span>
+            </span>
+            <button style={c.viewAll}>View all</button>
           </div>
-          <div style={{ textAlign:"right" }}>
-            <div style={{ fontSize:14, fontWeight:600, color:"#111827" }}>2.5K</div>
-            <div style={{ fontSize:11, color:"#6b7280" }}>Views</div>
+          <div style={c.faqRow}>
+            <div style={c.faqIconBox}><IconFile /></div>
+            <div style={{ flex:1 }}>
+              <div style={{ fontSize:13, fontWeight:500, color:"var(--text-primary,#111827)" }}>API Authentication Guide</div>
+              <div style={{ fontSize:11, color:"var(--text-secondary,#6b7280)", marginTop:2 }}>Your most viewed FAQ</div>
+            </div>
+            <div style={{ textAlign:"right" }}>
+              <div style={{ fontSize:14, fontWeight:600, color:"var(--text-primary,#111827)" }}>2.5K</div>
+              <div style={{ fontSize:11, color:"var(--text-secondary,#6b7280)" }}>Views</div>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Content Performance */}
-      <div style={c.card}>
-        <div style={c.cardHead}>
-          <span style={c.cardTitle}>Content Performance</span>
-          <button style={c.viewAll}>View all</button>
-        </div>
-        <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-          {contentPerformance.map((item) => (
-            <div key={item.label} style={{ display:"flex", alignItems:"center", gap:8 }}>
-              <span style={c.cpLabel}>{item.label}</span>
-              <span style={c.cpVal}>{item.value}</span>
-              <div style={c.cpBarWrap}>
-                <div style={{ ...c.cpBar, width:`${item.barPct}%`, background:item.color }} />
+        {/* Content Performance */}
+        <div style={c.card}>
+          <div style={c.cardHead}>
+            <span style={c.cardTitle}>Content Performance</span>
+            <button style={c.viewAll}>View all</button>
+          </div>
+          <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+            {contentPerformance.map((item) => (
+              <div key={item.label} style={{ display:"flex", alignItems:"center", gap:8 }}>
+                <span style={c.cpLabel}>{item.label}</span>
+                <span style={c.cpVal}>{item.value}</span>
+                <div style={c.cpBarWrap}>
+                  <div style={{ ...c.cpBar, width:`${item.barPct}%`, background:item.color }} />
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-      </div>
 
-      {/* Audience Engagement — now its own separate card */}
-      <div style={c.card}>
-        <div style={c.cardHead}>
-          <span style={c.cardTitle}>Audience Engagement</span>
-          <button style={c.viewAll}>View all</button>
+        {/* Audience Engagement */}
+        <div style={c.card}>
+          <div style={c.cardHead}>
+            <span style={c.cardTitle}>Audience Engagement</span>
+            <button style={c.viewAll}>View all</button>
+          </div>
+          <div>
+            {audienceData.map((item, i) => (
+              <div key={i} style={{ ...c.audRow, ...(i < audienceData.length - 1 ? c.audBorder : {}) }}>
+                <span style={c.audIcon}>{item.isClock ? <IconClock /> : <IconPerson />}</span>
+                <span style={c.audLabel}>{item.label}</span>
+                <span style={c.audVal}>{item.value}</span>
+                <span style={c.audChange}>↑ {item.change}</span>
+              </div>
+            ))}
+          </div>
         </div>
-        <div>
-          {audienceData.map((item, i) => (
-            <div key={i} style={{ ...c.audRow, borderBottom: i < audienceData.length - 1 ? "1px solid #f1f5f9" : "none" }}>
-              <span style={c.audIcon}>{item.isClock ? <IconClock /> : <IconPerson />}</span>
-              <span style={c.audLabel}>{item.label}</span>
-              <span style={c.audVal}>{item.value}</span>
-              <span style={c.audChange}>↑ {item.change}</span>
-            </div>
-          ))}
-        </div>
-      </div>
 
-</div>
+      </div>
     </div>
   );
 }
 
-const c = {
-  layout: {
-    display: "grid",
-    gridTemplateColumns: "1fr 340px",
-    gap: 20,
-    padding: 20,
-    alignItems: "stretch",
-    fontFamily: "Inter, system-ui, sans-serif",
-  },
-  leftCol: { display:"flex", flexDirection:"column", gap:16, height:"100%" },
-  rightCol: { display:"flex", flexDirection:"column", gap:16 },
+// ─── Theme-aware style helper ─────────────────────────────────────────────────
+// We read the data-theme attribute at render time so styles react to toggles.
+function useThemeStyles() {
+  const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+  return {
+    layout: {
+      display: "grid",
+      gridTemplateColumns: "1fr 340px",
+      gap: 20,
+      padding: 20,
+      alignItems: "stretch",
+      fontFamily: "Inter, system-ui, sans-serif",
+    },
+    leftCol:  { display: "flex", flexDirection: "column", gap: 16, height: "100%" },
+    rightCol: { display: "flex", flexDirection: "column", gap: 16 },
 
-  card: {
-    background: "#ffffff",
-    border: "1px solid #e5e7eb",
-    borderRadius: 10,
-    padding: "16px 18px",
-  },
-  cardHead: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 14,
-  },
-  cardTitle: { fontSize:14, fontWeight:600, color:"#111827" },
-  dropdown: {
-    display: "flex",
-    alignItems: "center",
-    gap: 6,
-    fontSize: 12,
-    color: "#374151",
-    background: "#f9fafb",
-    border: "1px solid #e5e7eb",
-    borderRadius: 6,
-    padding: "4px 10px",
-    cursor: "pointer",
-    userSelect: "none",
-  },
-  viewAll: {
-    fontSize:12, color:"#2563eb",
-    background:"none", border:"none", cursor:"pointer", padding:0,
-    fontFamily:"inherit",
-  },
-  overviewGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(4, 1fr)",
-    border: "1px solid #e5e7eb",
-    borderRadius: 8,
-    overflow: "hidden",
-  },
-  overviewBox: {
-    display: "flex",
-    flexDirection: "column",
-    padding: "14px 16px",
-    background: "#ffffff",
-  },
-  ovLabel:  { fontSize:11, color:"#6b7280", marginBottom:6 },
-  ovValue:  { fontSize:22, fontWeight:600, color:"#111827", lineHeight:1.1 },
-  ovChange: { display:"flex", alignItems:"center", fontSize:12, color:"#16a34a", marginTop:4 },
+    card: {
+      background:   isDark ? "var(--bg-white, #242424)" : "var(--bg-white, #ffffff)",
+      border:       "1px solid var(--border, #e5e7eb)",
+      borderRadius: 10,
+      padding:      "16px 18px",
+    },
+    cardHead: {
+      display:        "flex",
+      alignItems:     "center",
+      justifyContent: "space-between",
+      marginBottom:   14,
+    },
+    cardTitle:  { fontSize: 14, fontWeight: 600, color: "var(--text-primary, #111827)" },
+    dropdown: {
+      display:     "flex",
+      alignItems:  "center",
+      gap:         6,
+      fontSize:    12,
+      color:       "var(--text-secondary, #374151)",
+      background:  isDark ? "var(--bg-hover, #2e2e2e)" : "var(--bg-hover, #f9fafb)",
+      border:      "1px solid var(--border, #e5e7eb)",
+      borderRadius: 6,
+      padding:     "4px 10px",
+      cursor:      "pointer",
+      userSelect:  "none",
+    },
+    viewAll: {
+      fontSize: 12, color: "var(--accent-blue, #2563eb)",
+      background: "none", border: "none", cursor: "pointer", padding: 0,
+      fontFamily: "inherit",
+    },
+    overviewGrid: {
+      display:             "grid",
+      gridTemplateColumns: "repeat(4, 1fr)",
+      border:              "1px solid var(--border, #e5e7eb)",
+      borderRadius:        8,
+      overflow:            "hidden",
+    },
+    overviewBox: {
+      display:        "flex",
+      flexDirection:  "column",
+      padding:        "14px 16px",
+      background:     isDark ? "var(--bg-white, #242424)" : "#ffffff",
+    },
+    ovLabel:  { fontSize: 11, color: "var(--text-secondary, #6b7280)", marginBottom: 6 },
+    ovValue:  { fontSize: 22, fontWeight: 600, color: "var(--text-primary, #111827)", lineHeight: 1.1 },
+    ovChange: { display: "flex", alignItems: "center", fontSize: 12, color: isDark ? "#4ade80" : "#16a34a", marginTop: 4 },
 
-  faqRow: {
-    display: "flex",
-    alignItems: "center",
-    gap: 10,
-    background: "#f9fafb",
-    borderRadius: 8,
-    padding: "10px 12px",
-  },
-  faqIconBox: {
-    width:32, height:32,
-    background:"#fff", border:"1px solid #e5e7eb", borderRadius:6,
-    display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0,
-  },
+    faqRow: {
+      display:     "flex",
+      alignItems:  "center",
+      gap:         10,
+      background:  isDark ? "var(--bg-hover, #2e2e2e)" : "#f9fafb",
+      borderRadius: 8,
+      padding:     "10px 12px",
+    },
+    faqIconBox: {
+      width: 32, height: 32,
+      background:   isDark ? "var(--bg-white, #2a2a2a)" : "#fff",
+      border:       "1px solid var(--border, #e5e7eb)",
+      borderRadius: 6,
+      display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+    },
 
-  cpLabel:   { fontSize:12, color:"#6b7280", width:148, flexShrink:0 },
-  cpVal:     { fontSize:12, color:"#111827", width:34, flexShrink:0 },
-  cpBarWrap: { flex:1, height:4, background:"#f1f5f9", borderRadius:99, overflow:"hidden" },
-  cpBar:     { height:"100%", borderRadius:99, transition:"width 0.4s ease" },
+    cpLabel:   { fontSize: 12, color: "var(--text-secondary, #6b7280)", width: 148, flexShrink: 0 },
+    cpVal:     { fontSize: 12, color: "var(--text-primary, #111827)", width: 34, flexShrink: 0 },
+    cpBarWrap: { flex: 1, height: 4, background: isDark ? "var(--bg-hover, #2e2e2e)" : "#f1f5f9", borderRadius: 99, overflow: "hidden" },
+    cpBar:     { height: "100%", borderRadius: 99, transition: "width 0.4s ease" },
 
-  audRow:   { display:"flex", alignItems:"center", gap:8, padding:"10px 0" },
-  audIcon:  { width:20, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 },
-  audLabel: { flex:1, fontSize:13, color:"#374151" },
-  audVal:   { fontSize:13, fontWeight:600, color:"#111827" },
-  audChange:{ fontSize:12, color:"#16a34a", fontWeight:500, marginLeft:6 },
-};
+    audRow:   { display: "flex", alignItems: "center", gap: 8, padding: "10px 0" },
+    audIcon:  { width: 20, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 },
+    audLabel: { flex: 1, fontSize: 13, color: "var(--text-secondary, #374151)" },
+    audVal:   { fontSize: 13, fontWeight: 600, color: "var(--text-primary, #111827)" },
+    audChange:{ fontSize: 12, color: isDark ? "#4ade80" : "#16a34a", fontWeight: 500, marginLeft: 6 },
+    audBorder:{ borderBottom: `1px solid var(--border, ${isDark ? "#2e303a" : "#f1f5f9"})` },
+  };
+}
