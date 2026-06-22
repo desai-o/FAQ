@@ -7,12 +7,11 @@ import Hashtag from "../components/Hashtag";
 import { useFAQ } from "../context/FAQContext";
 import { useAuth } from "../context/AuthContext";
 import {
-  deleteFaq, deleteQuery, deleteAnswer,
+  deleteFaq, deleteQuery, deleteAnswer, updateAnswer, updateQuery,
   followResource, unfollowResource, muteFollow,
   fetchAnswers, fetchFaqTranslations, createFaqTranslation, fetchFaqById, createAnswerTranslation, fetchAnswerTranslations,
   createBounty, awardBounty, fetchBounties,
 } from "../api/faqApi";
-import { deleteFaq, deleteQuery, updateAnswer, deleteAnswer, updateQuery, followResource, unfollowResource, muteFollow, fetchAnswers, fetchFaqTranslations, createFaqTranslation, createBounty, awardBounty, fetchBounties } from "../api/faqApi";
 import ErrorToast from "../components/ErrorToast";
 
 // ── Supported languages (Indian + global) ────────────────────────────────────
@@ -122,7 +121,6 @@ function normalizeRemoteQuestion(data) {
 }
 
 function QuestionDetail() {
-  const { questions, upvoteQuestion, bookmarkQuestion, addAnswer, upvoteAnswer } = useFAQ();
   const { questions, upvoteQuestion, bookmarkQuestion, addAnswer, upvoteAnswer, loadingQuestions, refreshQuestions, deleteQuestion, restoreQuestion, removeAnswerLocally, restoreAnswerLocally } = useFAQ();
   const { id } = useParams();
   const [showModal, setShowModal] = useState(false);
@@ -153,6 +151,15 @@ function QuestionDetail() {
   const { user } = useAuth();
   const [error, setError] = useState("");
   const [answers, setAnswers] = useState([]);
+  const [isEditingQuestion, setIsEditingQuestion] = useState(false);
+  const [editQuestionData, setEditQuestionData] = useState({
+    title: "",
+    description: "",
+    category: "",
+    hashtags: []
+  });
+  const [editingAnswerId, setEditingAnswerId] = useState(null);
+  const [editAnswerContent, setEditAnswerContent] = useState("");
 
   const getQuestionId = (item) => String(item.id || item._id || item.mongo_id || "");
   const [remoteQuestion, setRemoteQuestion] = useState(null);
@@ -385,6 +392,14 @@ useEffect(() => {
     );
   }
 
+  function canEdit(resource) {
+    if (!user || !resource) return false;
+    return (
+      user.role === "admin" ||
+      String(resource.userId || resource.user_id) === String(user.id)
+    );
+  }
+
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (followMenuRef.current && !followMenuRef.current.contains(event.target)) {
@@ -448,13 +463,8 @@ useEffect(() => {
     if (question.id) upvoteAnswer(question.id, answerId);
   };
 
-  const handleSubmitReply = () => {
+  const handleSubmitReply = async () => {
     if (replyText.trim() && question.id) {
-      addAnswer(question.id, replyText);
-      setReplyText("");
-const handleSubmitReply = async () => {
-    if (replyText.trim() && question.id) {
-      console.log("DEBUG sourceType:", question.sourceType, "full question:", question);
       try {
         const newAnswer = await addAnswer(question.id, replyText, question.sourceType || "faq");
         if (newAnswer) {
@@ -967,35 +977,25 @@ const handleSubmitReply = async () => {
                   <span>Asked by <strong>{question.author}</strong></span>
                   <span>{question.time}</span>
                   <span>👁 {question.views} views</span>
+                  {question.updatedAt &&
+                    question.createdAt &&
+                    question.updatedAt !== question.createdAt && (
+                      <span
+                        style={{
+                          fontSize: "12px",
+                          color: "#888",
+                          fontStyle: "italic"
+                        }}
+                      >
+                        Edited
+                      </span>
+                    )}
                   <button
                     className={`bookmark-btn ${question.bookmarked ? "bookmarked" : ""}`}
                     onClick={toggleBookmark}
                   >
                     {question.bookmarked ? "★ Bookmarked" : "☆ Bookmark"}
                   </button>
-                    <div className="detail-meta">
-                      <span>Asked by <strong>{question.author}</strong></span>
-                      {question.updatedAt &&
-                        question.createdAt &&
-                        question.updatedAt !== question.createdAt && (
-                          <span
-                            style={{
-                              fontSize: "12px",
-                              color: "#888",
-                              fontStyle: "italic"
-                          }}
-                      >
-                          Edited
-                        </span>
-                      )}
-                      <span>{question.time}</span>
-                      <span>👁 {question.views} views</span>
-                      <button
-                        className={`bookmark-btn ${question.bookmarked ? "bookmarked" : ""}`}
-                        onClick={toggleBookmark}
-                      >
-                        {question.bookmarked ? "★ Bookmarked" : "☆ Bookmark"}
-                      </button>
 
                   {canDelete(question) && (
                     <button
@@ -1045,76 +1045,79 @@ const handleSubmitReply = async () => {
                         boxShadow: "0 4px 12px rgba(0,0,0,0.1)", zIndex: 10, width: "160px",
                         display: "flex", flexDirection: "column", padding: "4px 0"
                       }}>
-                      className="bookmark-btn edit-button"
-                      onClick={()=> {
-                        setEditQuestionData({
-                          title: question.title || "",
-                          description: question.description || "",
-                          category: question.category || "",
-                          hashtags: question.hashtags || []
-                      });
-
-                      setIsEditingQuestion(true);
-                    }}
-                      >
-                     ✎ Edit
-                    </button>
-                  )}
-
-                      {canDelete(question) && (
                         <button
-                          className="bookmark-btn danger-button"
-                          onClick={async () => {
-                            const confirmed = window.confirm(
-                              "Are you sure you want to delete this question?"
-                            );
-                            if (!confirmed) return;
-                           const deletedQuestion = question;
-                           deleteQuestion(question.id);
-                           let countdown = 10;
-                           const intervalId = setInterval(() => {
-                             countdown--;
-                           setPendingQuestionDelete(prev => {
-                             if (!prev) return null;
-                             return {
-                               ...prev,
-                               countdown
-                             };
-                           });
-                         }, 1000);
-                         const timeoutId = setTimeout(async () => {
-                           clearInterval(intervalId);
-                           try {
-                             await deleteQuery(deletedQuestion.id);
-                             await refreshQuestions();
-                             setPendingQuestionDelete(null);
-                             if (!hasGoneBack) {
-                              window.history.back();}
-                           } catch (err) {
-                             setError(err.message || "Failed to delete question.");
-                           }
-                         }, 10000);
-                         setPendingQuestionDelete({
-                           question: deletedQuestion,
-                           countdown: 10,
-                           timeoutId,
-                           intervalId
-                         });
-                       }}
-                      >
-                        🗑 Delete
-                      </button>
-                  )}
+                          className="bookmark-btn edit-button"
+                          onClick={() => {
+                            setEditQuestionData({
+                              title: question.title || "",
+                              description: question.description || "",
+                              category: question.category || "",
+                              hashtags: question.hashtags || []
+                            });
 
-                      <div style={{ position: "relative" }} ref={followMenuRef}>
+                            setIsEditingQuestion(true);
+                            setShowFollowMenu(false);
+                          }}
+                        >
+                          ✎ Edit
+                        </button>
+
+                        {canDelete(question) && (
+                          <button
+                            className="bookmark-btn danger-button"
+                            onClick={async () => {
+                              const confirmed = window.confirm(
+                                "Are you sure you want to delete this question?"
+                              );
+                              if (!confirmed) return;
+
+                              const deletedQuestion = question;
+                              deleteQuestion(question.id);
+                              let countdown = 10;
+                              const intervalId = setInterval(() => {
+                                countdown--;
+                                setPendingQuestionDelete((prev) => {
+                                  if (!prev) return null;
+                                  return {
+                                    ...prev,
+                                    countdown
+                                  };
+                                });
+                              }, 1000);
+                              const timeoutId = setTimeout(async () => {
+                                clearInterval(intervalId);
+                                try {
+                                  await deleteQuery(deletedQuestion.id);
+                                  await refreshQuestions();
+                                  setPendingQuestionDelete(null);
+                                  if (!hasGoneBack) {
+                                    window.history.back();
+                                  }
+                                } catch (err) {
+                                  setError(err.message || "Failed to delete question.");
+                                }
+                              }, 10000);
+                              setPendingQuestionDelete({
+                                question: deletedQuestion,
+                                countdown: 10,
+                                timeoutId,
+                                intervalId
+                              });
+                              setShowFollowMenu(false);
+                            }}
+                          >
+                            🗑 Delete
+                          </button>
+                        )}
+
                         <button
                           onClick={handleMuteToggle}
                           style={{
                             background: "none", border: "none", width: "100%", textAlign: "left",
                             padding: "8px 12px", fontSize: "13px", cursor: "pointer", color: "#1a1a1a"
                           }}
-                          onMouseOver={e => e.currentTarget.style.background = "#f5f5f5"}
-                          onMouseOut={e => e.currentTarget.style.background = "none"}
+                          onMouseOver={(e) => e.currentTarget.style.background = "#f5f5f5"}
+                          onMouseOut={(e) => e.currentTarget.style.background = "none"}
                         >
                           {followData.isMuted ? "Unmute notifications" : "Mute notifications"}
                         </button>
@@ -1124,8 +1127,8 @@ const handleSubmitReply = async () => {
                             background: "none", border: "none", width: "100%", textAlign: "left",
                             padding: "8px 12px", fontSize: "13px", cursor: "pointer", color: "#ef4444"
                           }}
-                          onMouseOver={e => e.currentTarget.style.background = "#f5f5f5"}
-                          onMouseOut={e => e.currentTarget.style.background = "none"}
+                          onMouseOver={(e) => e.currentTarget.style.background = "#f5f5f5"}
+                          onMouseOut={(e) => e.currentTarget.style.background = "none"}
                         >
                           Unfollow
                         </button>
@@ -1140,12 +1143,55 @@ const handleSubmitReply = async () => {
           {/* ── Answers Section ── */}
           <section className="answers-section">
             <h2 className="answers-heading">
-              {question.answers ? question.answers.length : 0}{" "}
-              {question.answers && question.answers.length === 1 ? "Answer" : "Answers"}
+              {answers ? answers.length : 0}{" "}
+              {answers && answers.length === 1 ? "Answer" : "Answers"}
             </h2>
 
+            {pendingAnswerDelete && (
+              <div
+                style={{
+                  marginBottom: "16px",
+                  padding: "12px 16px",
+                  borderRadius: "8px",
+                  backgroundColor: "rgba(245, 158, 11, 0.1)",
+                  border: "1px solid rgba(245, 158, 11, 0.3)",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center"
+                }}
+              >
+                <span>
+                  Answer deleted. Undo available for{" "}
+                  {pendingAnswerDelete.countdown} seconds.
+                </span>
+
+                <button
+                  className="bookmark-btn"
+                  onClick={() => {
+                    clearTimeout(pendingAnswerDelete.timeoutId);
+                    clearInterval(pendingAnswerDelete.intervalId);
+
+                    setAnswers((prev) => [
+                      pendingAnswerDelete.answer,
+                      ...prev
+                    ]);
+                    restoreAnswerLocally(
+                      question.id,
+                      pendingAnswerDelete.answer
+                    );
+                    setPendingAnswerDelete(null);
+                  }}
+                >
+                  Undo
+                </button>
+              </div>
+            )}
+
             {answers && answers.map((answer) => (
-              <div key={answer.id} className={`answer-card ${answer.isBest ? "best-answer" : ""}`}>
+              <div
+                key={answer.id}
+                className={`answer-card ${answer.isBest ? "best-answer" : ""}`}
+              >
                 <div className="vote-col">
                   <button
                     className={`upvote ${answer.voted ? "upvoted" : ""}`}
@@ -1155,62 +1201,6 @@ const handleSubmitReply = async () => {
                   </button>
                   <span className="vote-count">{answer.votes}</span>
                 </div>
-              {pendingAnswerDelete && (
-                <div
-                  style={{
-                    marginBottom: "16px",
-                    padding: "12px 16px",
-                    borderRadius: "8px",
-                    backgroundColor: "rgba(245, 158, 11, 0.1)",
-                    border: "1px solid rgba(245, 158, 11, 0.3)",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center"
-                  }}
-                >
-                  <span>
-                    Answer deleted. Undo available for{" "}
-                    {pendingAnswerDelete.countdown} seconds.
-                  </span>
-
-                  <button
-                    className="bookmark-btn"
-                    onClick={() => {
-                      clearTimeout(pendingAnswerDelete.timeoutId);
-                      clearInterval(pendingAnswerDelete.intervalId);
-
-                      setAnswers((prev) => [
-                        pendingAnswerDelete.answer,
-                        ...prev
-                      ]);
-                      restoreAnswerLocally(
-                        question.id,
-                        pendingAnswerDelete.answer
-                      );
-                      setPendingAnswerDelete(null);
-                    }}
-                  >
-                    Undo
-                  </button>
-                </div>
-              )}
-
-              <section className="answers-section">
-                <h2 className="answers-heading">
-                  {answers ? answers.length : 0} {answers && answers.length === 1 ? "Answer" : "Answers"}
-                </h2>
-
-                {answers && answers.map((answer) => (
-                  <div key={answer.id} className={`answer-card ${answer.isBest ? "best-answer" : ""}`}>
-                    <div className="vote-col">
-                      <button
-                        className={`upvote ${answer.voted ? "upvoted" : ""}`}
-                        onClick={() => toggleAnswerVote(answer.id)}
-                      >
-                        ▲
-                      </button>
-                      <span className="vote-count">{answer.votes}</span>
-                    </div>
 
                 <div className="answer-body">
                   {answer.isBest && (
@@ -1218,7 +1208,6 @@ const handleSubmitReply = async () => {
                   )}
                   <p className="answer-text">{answer.content}</p>
 
-                  {/* ✅ NEW: Per-answer translation controls */}
                   <AnswerTranslationControls
                     answerId={answer.id}
                     originalContent={answer.content}
@@ -1226,77 +1215,78 @@ const handleSubmitReply = async () => {
 
                   {editingAnswerId === answer.id ? (
                     <>
-                    <textarea
-                      value={editAnswerContent}
-                      onChange={(e) => setEditAnswerContent(e.target.value)}
-                      rows={4}
-                      style={{
-                        width: "100%",
-                        padding: "10px",
-                        borderRadius: "8px"
-                      }}
-                    />
-                    <div
-                      style={{
-                        display: "flex",
-                        gap: "10px",
-                        marginTop: "10px"
-                      }}
-                    >
-                      <button
-                        className="bookmark-btn"
-                        onClick={async () => {
-                          if (!editAnswerContent.trim()) {
-                            setError("Answer cannot be empty.");
-                            return;
-                          }
-                          try {
-                            await updateAnswer(answer.id, {
-                            content: editAnswerContent
-                          });
-                          setAnswers((prev) =>
-                            prev.map((a) =>
-                              String(a.id) === String(answer.id)
-                                ? { ...a, content: editAnswerContent, updatedAt: new Date().toISOString() }
-                                : a
-                             )
-                            );
-                            setEditingAnswerId(null);
-                          } catch (err) {
-                            setError(err.message || "Failed to update answer.");
-                          }
+                      <textarea
+                        value={editAnswerContent}
+                        onChange={(e) => setEditAnswerContent(e.target.value)}
+                        rows={4}
+                        style={{
+                          width: "100%",
+                          padding: "10px",
+                          borderRadius: "8px"
+                        }}
+                      />
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: "10px",
+                          marginTop: "10px"
                         }}
                       >
-                        Save
-                      </button>
+                        <button
+                          className="bookmark-btn"
+                          onClick={async () => {
+                            if (!editAnswerContent.trim()) {
+                              setError("Answer cannot be empty.");
+                              return;
+                            }
+                            try {
+                              await updateAnswer(answer.id, {
+                                content: editAnswerContent
+                              });
+                              setAnswers((prev) =>
+                                prev.map((a) =>
+                                  String(a.id) === String(answer.id)
+                                    ? { ...a, content: editAnswerContent, updatedAt: new Date().toISOString() }
+                                    : a
+                                )
+                              );
+                              setEditingAnswerId(null);
+                            } catch (err) {
+                              setError(err.message || "Failed to update answer.");
+                            }
+                          }}
+                        >
+                          Save
+                        </button>
 
-                      <button
-                        className="bookmark-btn"
-                        onClick={() => {
-                          setEditingAnswerId(null);
-                          setEditAnswerContent("");
-                        }}
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </>
-                 ) : (
+                        <button
+                          className="bookmark-btn"
+                          onClick={() => {
+                            setEditingAnswerId(null);
+                            setEditAnswerContent("");
+                          }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </>
+                  ) : (
                     <p className="answer-text">{answer.content}</p>
                   )}
+
                   <div className="answer-meta">
                     <div className="answer-author">
                       <div className="avatar small">{answer.avatar}</div>
                       <strong>{answer.author}</strong>
-                    </div> 
+                    </div>
                     <div
-                        style={{
-                          marginLeft: "auto",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "12px"
-                        }}
-                      >
+                      style={{
+                        marginLeft: "auto",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "12px"
+                      }}
+                    >
                       <div
                         style={{
                           display: "flex",
@@ -1305,19 +1295,19 @@ const handleSubmitReply = async () => {
                         }}
                       >
                         {answer.updatedAt &&
-                        answer.createdAt &&
-                        answer.updatedAt !== answer.createdAt && (
-                          <span
-                            style={{
-                              fontSize: "12px",
-                              color: "#888",
-                             fontStyle: "italic"
-                        }}
-                      >
-                        Edited
-                      </span>
-                      )}
-                         <span className="answer-time">{answer.time}</span>
+                          answer.createdAt &&
+                          answer.updatedAt !== answer.createdAt && (
+                            <span
+                              style={{
+                                fontSize: "12px",
+                                color: "#888",
+                                fontStyle: "italic"
+                              }}
+                            >
+                              Edited
+                            </span>
+                          )}
+                        <span className="answer-time">{answer.time}</span>
                       </div>
                       {canEdit(answer) && (
                         <button
@@ -1326,84 +1316,84 @@ const handleSubmitReply = async () => {
                             setEditingAnswerId(answer.id);
                             setEditAnswerContent(answer.content);
                           }}
-                      >
-                        ✎ Edit
-                      </button>
-                    )}
-                    {canDelete(answer) && (
-                      <button
-                        className="bookmark-btn danger-button"
-                        onClick={() => {
-                          const confirmed = window.confirm(
-                            "Are you sure you want to delete this answer?"
-                          );
+                        >
+                          ✎ Edit
+                        </button>
+                      )}
+                      {canDelete(answer) && (
+                        <button
+                          className="bookmark-btn danger-button"
+                          onClick={() => {
+                            const confirmed = window.confirm(
+                              "Are you sure you want to delete this answer?"
+                            );
 
-                          if (!confirmed) return;
+                            if (!confirmed) return;
 
-                          const deletedAnswer = answer;
+                            const deletedAnswer = answer;
 
-                          setAnswers((prev) =>
-                            prev.filter((item) => String(item.id) !== String(answer.id))
-                          );
-                          removeAnswerLocally(question.id, answer.id);
-                          let countdown = 10;
+                            setAnswers((prev) =>
+                              prev.filter((item) => String(item.id) !== String(answer.id))
+                            );
+                            removeAnswerLocally(question.id, answer.id);
+                            let countdown = 10;
 
-                          const intervalId = setInterval(() => {
-                            countdown--;
+                            const intervalId = setInterval(() => {
+                              countdown--;
 
-                            setPendingAnswerDelete((prev) => {
-                              if (!prev) return null;
+                              setPendingAnswerDelete((prev) => {
+                                if (!prev) return null;
 
-                              return {
-                                ...prev,
-                                countdown
-                              };
+                                return {
+                                  ...prev,
+                                  countdown
+                                };
+                              });
+                            }, 1000);
+
+                            const timeoutId = setTimeout(async () => {
+                              clearInterval(intervalId);
+
+                              try {
+                                await deleteAnswer(deletedAnswer.id);
+                                setPendingAnswerDelete(null);
+                                await loadAnswers(0);
+                              } catch (err) {
+                                setError(err.message || "Failed to delete answer.");
+                              }
+                            }, 10000);
+
+                            setPendingAnswerDelete({
+                              answer: deletedAnswer,
+                              countdown: 10,
+                              timeoutId,
+                              intervalId
                             });
-                          }, 1000);
-
-                          const timeoutId = setTimeout(async () => {
-                            clearInterval(intervalId);
-
-                            try {
-                              await deleteAnswer(deletedAnswer.id);
-                              setPendingAnswerDelete(null);
-                              await loadAnswers(0);
-                            } catch (err) {
-                              setError(err.message || "Failed to delete answer.");
-                            }
-                          }, 10000);
-
-                          setPendingAnswerDelete({
-                            answer: deletedAnswer,
-                            countdown: 10,
-                            timeoutId,
-                            intervalId
-                          });
-                        }}
-                      >
-                        🗑 Delete
-                      </button>
-                    )}
+                          }}
+                        >
+                          🗑 Delete
+                        </button>
+                      )}
+                      {activeBounty && (String(activeBounty.createdBy) === String(user?.id) || user?.role === "admin") && (
+                        <button
+                          onClick={() => handleAwardBounty(answer.id)}
+                          className="bounty-award-btn"
+                          style={{
+                            marginLeft: canDelete(answer) ? "10px" : "auto",
+                            padding: "6px 12px",
+                            borderRadius: "6px",
+                            backgroundColor: "#f59e0b",
+                            color: "#fff",
+                            border: "none",
+                            cursor: "pointer",
+                            fontWeight: "bold",
+                            fontSize: "12px"
+                          }}
+                        >
+                          🏆 Award Bounty ({activeBounty.amount} pts)
+                        </button>
+                      )}
                     </div>
-                    {activeBounty && (String(activeBounty.createdBy) === String(user?.id) || user?.role === "admin") && (
-                      <button
-                        onClick={() => handleAwardBounty(answer.id)}
-                        className="bounty-award-btn"
-                        style={{
-                          marginLeft: canDelete(answer) ? "10px" : "auto",
-                          padding: "6px 12px",
-                          borderRadius: "6px",
-                          backgroundColor: "#f59e0b",
-                          color: "#fff",
-                          border: "none",
-                          cursor: "pointer",
-                          fontWeight: "bold",
-                          fontSize: "12px"
-                        }}
-                      >
-                        🏆 Award Bounty ({activeBounty.amount} pts)
-                      </button>
-                    )}
                   </div>
                 </div>
               </div>
