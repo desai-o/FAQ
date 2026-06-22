@@ -312,3 +312,7 @@ export async function queryGraphQL(query, variables = {}) {
     body: JSON.stringify({ query, variables })
   });
 }
+
+export async function fetchContributorLeaderboard() {
+  return request("/contributors/leaderboard");
+}
