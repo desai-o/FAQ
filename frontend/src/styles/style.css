@@ -1801,8 +1801,12 @@ input, select, textarea {
   font-size: 24px;
 }
 
+.contributor-card .avatar {
+  margin: 0 auto;
+}
+
 .contributor-name {
-  font-size: 16px;
+  font-size: 20px;
   font-weight: 700;
   margin-top: 12px;
   margin-bottom: 16px;
@@ -4916,4 +4920,81 @@ html:has(.landing-container) {
   color: #f59e0b;
   border-color: rgba(245, 158, 11, 0.3);
   background: rgba(245, 158, 11, 0.08);
+}
+
+/* =============================================
+   Leaderboard Loading Skeletons & Table Styles
+   ============================================= */
+.skeleton-card {
+  background: var(--bg-white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 40px 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  overflow: hidden;
+  min-height: 180px;
+}
+
+[data-theme="dark"] .skeleton-card {
+  background: #000000;
+  border-color: #222222;
+}
+
+.skeleton-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--bg-hover);
+  margin-bottom: 16px;
+}
+
+.skeleton-text {
+  background: var(--bg-hover);
+  border-radius: 4px;
+  margin-bottom: 10px;
+}
+
+.skeleton-text.title {
+  width: 60%;
+  height: 16px;
+}
+
+.skeleton-text.subtitle {
+  width: 80%;
+  height: 12px;
+}
+
+.skeleton-text.short {
+  width: 40%;
+  height: 12px;
+}
+
+.skeleton-pulse {
+  animation: skeletonPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes skeletonPulse {
+  0% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.6;
+  }
+}
+
+.skeleton-row td {
+  padding: 16px;
+}
+
+.skeleton-line {
+  background: var(--bg-hover);
+  height: 12px;
+  border-radius: 4px;
+  width: 100%;
 }
