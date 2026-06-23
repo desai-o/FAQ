@@ -127,15 +127,36 @@ export async function deleteFaq(id) {
   });
 }
 
+export async function updateFaq(id, payload) {
+  return request(`/faqs/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload)
+  });
+}
+
 export async function deleteQuery(id) {
   return request(`/queries/${id}`, {
     method: "DELETE"
   });
 }
 
+export async function updateQuery(id, payload) {
+  return request(`/queries/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload)
+  });
+}
+
 export async function deleteAnswer(id) {
   return request(`/answers/${id}`, {
     method: "DELETE"
+  });
+}
+
+export async function updateAnswer(id, payload) {
+  return request(`/answers/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload)
   });
 }
 
@@ -292,4 +313,6 @@ export async function queryGraphQL(query, variables = {}) {
   });
 }
 
-
+export async function fetchContributorLeaderboard() {
+  return request("/contributors/leaderboard");
+}

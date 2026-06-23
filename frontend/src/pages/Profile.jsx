@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
 import ProfileHeader from "../components/profile/ProfileHeader";
@@ -11,7 +11,7 @@ import Analytics from "../components/profile/Analytics";
 import RecentActivity from "../components/profile/RecentActivity";
 import QuickLinks from "../components/profile/QuickLinks";
 import { useAuth } from "../context/AuthContext";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import AnalyticsTab from "../components/profile/AnalyticsTab";
 import NotificationPreferences from "../components/profile/NotificationPreferences";
 

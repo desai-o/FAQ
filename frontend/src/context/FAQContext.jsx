@@ -588,7 +588,57 @@ export function FAQProvider({ children }) {
       return tempQuestion;
     }
   };
-
+  const editQuestion = (questionId, updatedData) => {
+  setQuestions((prev) =>
+    prev.map((q) =>
+      String(q.id || q._id) === String(questionId)
+        ? {
+            ...q,
+            title: updatedData.title,
+            description: updatedData.description,
+            category: updatedData.category,
+            hashtags: updatedData.hashtags
+          }
+        : q
+    )
+  );
+  }; 
+  const deleteQuestion = (questionId) => {
+    setQuestions((prev) =>
+      prev.filter(
+        (q) => String(q.id || q._id) !== String(questionId)
+      )
+    );
+  };
+  const restoreQuestion = (question) => {
+    setQuestions((prev) => [question, ...prev]);
+  };
+  const removeAnswerLocally = (questionId, answerId) => {
+  setQuestions((prev) =>
+    prev.map((q) =>
+      String(q.id) === String(questionId)
+        ? {
+            ...q,
+            answers: (q.answers || []).filter(
+              (a) => String(a.id) !== String(answerId)
+            )
+          }
+        : q
+    )
+  );
+};
+const restoreAnswerLocally = (questionId, answer) => {
+  setQuestions((prev) =>
+    prev.map((q) =>
+      String(q.id) === String(questionId)
+        ? {
+            ...q,
+            answers: [answer, ...(q.answers || [])]
+          }
+        : q
+    )
+  );
+};
   const upvoteQuestion = async (id) => {
     requireLoggedInAction("upvote");
 
@@ -648,24 +698,28 @@ export function FAQProvider({ children }) {
       throw err;
     }
   };
-  const addAnswer = async (questionId, content) => {
+  const addAnswer = async (questionId, content, sourceType = "faq") => {
     requireLoggedInAction("submit an answer");
     const cleanContent = content.trim();
     if (!cleanContent) return null;
 
     const author = user?.name || "Community Member";
 
+    const payload = { content: cleanContent, author };
+    if (sourceType === "query") {
+      payload.queryId = questionId;
+    } else {
+      payload.questionId = questionId;
+    }
+
     try {
-      const response = await submitAnswer({
-        questionId,
-        content: cleanContent,
-        author
-      });
+      const response = await submitAnswer(payload);
 
       const savedAnswer = response.data;
 
       const newAnswer = {
         id: savedAnswer._id || savedAnswer.id,
+        userId: savedAnswer.userId || savedAnswer.user_id || user?.id,
         author: savedAnswer.author || author,
         avatar: (savedAnswer.author || author).charAt(0).toUpperCase(),
         content: savedAnswer.content,
@@ -787,6 +841,11 @@ export function FAQProvider({ children }) {
         addQuestion,
         upvoteQuestion,
         bookmarkQuestion,
+        editQuestion,
+        deleteQuestion,
+        restoreQuestion,
+        removeAnswerLocally,
+        restoreAnswerLocally,
         addAnswer,
         upvoteAnswer,
         backendOnline,

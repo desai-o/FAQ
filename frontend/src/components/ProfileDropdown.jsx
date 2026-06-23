@@ -141,16 +141,19 @@ function ProfileDropdown({ isOpen, onClose, onLogout }) {
           </a>
         </li>
         <li>
-          <a href="#bookmarks" onClick={(e) => { e.preventDefault(); onClose(); }}>
+          <Link to="/bookmarks" onClick={onClose}>
             <BookmarkIcon />
             <span>Bookmarks</span>
-          </a>
+          </Link>
         </li>
         <li>
-          <a href="#settings" onClick={(e) => { e.preventDefault(); onClose(); }}>
+          <Link to="/profile"
+            state={{ activeTab: "Account Settings"}}
+            onClick={onClose}
+            >
             <SettingsIcon />
             <span>Settings</span>
-          </a>
+          </Link>
         </li>
         <li>
           <a href="#shortcuts" onClick={(e) => { e.preventDefault(); onClose(); }}>
