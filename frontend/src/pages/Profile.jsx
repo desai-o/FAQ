@@ -15,29 +15,24 @@ import { Link, useLocation } from "react-router-dom";
 import AnalyticsTab from "../components/profile/AnalyticsTab";
 import NotificationPreferences from "../components/profile/NotificationPreferences";
 
+import LogoutModal from "../components/LogoutModal";
+
 function Profile() {
-  const location = useLocation();
-  const [activeTab, setActiveTab] = useState(
-    location.state?.activeTab || "Overview");
-
-    useEffect(() => {
-  if (location.state?.activeTab) {
-    setActiveTab(location.state.activeTab);
-  }
-}, [location.state]);
-
+  const [activeTab, setActiveTab] = useState("Overview");
+  const [showLogout, setShowLogout] = useState(false);
   const { user, loading } = useAuth();
 
   if (loading) {
     return (
       <>
-        <Sidebar />
+        <Sidebar onLogout={() => setShowLogout(true)} />
         <div className="main-wrapper">
-          <Topbar />
-          <main className="content" style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "60vh" }}>
+          <Topbar onLogout={() => setShowLogout(true)} />
+          <main className="content" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh" }}>
             <span className="auth-spinner"></span>
           </main>
         </div>
+        <LogoutModal open={showLogout} onClose={() => setShowLogout(false)} />
       </>
     );
   }
@@ -45,9 +40,9 @@ function Profile() {
   if (!user) {
     return (
       <>
-        <Sidebar />
+        <Sidebar onLogout={() => setShowLogout(true)} />
         <div className="main-wrapper">
-          <Topbar />
+          <Topbar onLogout={() => setShowLogout(true)} />
           <main className="content">
             <div className="auth-card" style={{ margin: "100px auto", textAlign: "center" }}>
               <div className="auth-header">
@@ -70,15 +65,16 @@ function Profile() {
             </div>
           </main>
         </div>
+        <LogoutModal open={showLogout} onClose={() => setShowLogout(false)} />
       </>
     );
   }
 
   return (
     <>
-      <Sidebar />
+      <Sidebar onLogout={() => setShowLogout(true)} />
       <div className="main-wrapper">
-        <Topbar />
+        <Topbar onLogout={() => setShowLogout(true)} />
         <main className="content">
 
           <ProfileHeader />
@@ -114,6 +110,7 @@ function Profile() {
 
         </main>
       </div>
+      <LogoutModal open={showLogout} onClose={() => setShowLogout(false)} />
     </>
   );
 }

@@ -6,18 +6,20 @@ import ActivityGraph from "../components/ActivityGraph";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
 import AskQuestionModal from "../components/AskQuestionModal";
+import LogoutModal from "../components/LogoutModal";
 import { useFAQ } from "../context/FAQContext";
 
 function Dashboard() {
   const [showModal, setShowModal] = useState(false);
+  const [showLogout, setShowLogout] = useState(false);
   const { categories } = useFAQ();
 
   return (
     <>
-      <Sidebar />
+      <Sidebar onLogout={() => setShowLogout(true)} />
 
       <div className="main-wrapper">
-        <Topbar openModal={() => setShowModal(true)} />
+        <Topbar openModal={() => setShowModal(true)} onLogout={() => setShowLogout(true)} />
 
         <main className="content">
           <section className="hero">
@@ -64,7 +66,49 @@ function Dashboard() {
         </main>
       </div>
 
+      <footer className="dashboard-footer-premium">
+        <div className="dashboard-footer-premium-grid">
+          <div className="dashboard-footer-premium-col brand">
+            <div className="dashboard-footer-premium-logo">
+              <div className="sidebar-logo-badge" style={{ width: "20px", height: "20px", fontSize: "11px", borderRadius: "4px" }}>Q</div>
+              <span>CrowdFAQ</span>
+            </div>
+            <p className="dashboard-footer-premium-desc">
+              CrowdFAQ brings communities together to co-create knowledge, solve questions instantly with AI, and scale support through human collaboration — all in one platform.
+            </p>
+          </div>
+          <div className="dashboard-footer-premium-col">
+            <h4>Navigate</h4>
+            <ul>
+              <li><a href="/dashboard">Dashboard</a></li>
+              <li><a href="/questions">Questions</a></li>
+              <li><a href="/categories">Categories</a></li>
+              <li><a href="/contributors">Contributors</a></li>
+            </ul>
+          </div>
+          <div className="dashboard-footer-premium-col">
+            <h4>Resources</h4>
+            <ul>
+              <li><a href="/help">Help Center</a></li>
+              <li><a href="/bookmarks">Bookmarks</a></li>
+              <li><a href="/subscription">Subscription</a></li>
+            </ul>
+          </div>
+          <div className="dashboard-footer-premium-col">
+            <h4>Contact</h4>
+            <ul>
+              <li><a href="mailto:hello@crowdfaq.com">hello@crowdfaq.com</a></li>
+              <li><a href="https://github.com/desai-o/FAQ" target="_blank" rel="noopener noreferrer">GitHub</a></li>
+            </ul>
+          </div>
+        </div>
+        <div className="dashboard-footer-premium-bottom">
+          &copy; {new Date().getFullYear()} CrowdFAQ. All rights reserved.
+        </div>
+      </footer>
+
       <AskQuestionModal open={showModal} onClose={() => setShowModal(false)} />
+      <LogoutModal open={showLogout} onClose={() => setShowLogout(false)} />
     </>
   );
 }

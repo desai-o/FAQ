@@ -3,10 +3,11 @@ import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
 import AskQuestionModal from "../components/AskQuestionModal";
 import { useFAQ } from "../context/FAQContext";
-import { fetchContributorLeaderboard } from "../api/faqApi";
+import LogoutModal from "../components/LogoutModal";
 
 function Contributors() {
   const [showModal, setShowModal] = useState(false);
+  const [showLogout, setShowLogout] = useState(false);
   const { contributors } = useFAQ();
 
   const [leaderboardData, setLeaderboardData] = useState([]);
@@ -76,9 +77,9 @@ function Contributors() {
 
   return (
     <>
-      <Sidebar />
+      <Sidebar onLogout={() => setShowLogout(true)} />
       <div className="main-wrapper">
-        <Topbar openModal={() => setShowModal(true)} />
+        <Topbar openModal={() => setShowModal(true)} onLogout={() => setShowLogout(true)} />
         <main className="content">
           <h1 className="page-title">Top Contributors</h1>
           <p className="page-subtitle">Community leaders making a difference</p>
@@ -305,6 +306,7 @@ function Contributors() {
         </main>
       </div>
       <AskQuestionModal open={showModal} onClose={() => setShowModal(false)} />
+      <LogoutModal open={showLogout} onClose={() => setShowLogout(false)} />
     </>
   );
 }

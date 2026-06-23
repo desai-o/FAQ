@@ -5,12 +5,14 @@ import Topbar from "../components/Topbar";
 import AskQuestionModal from "../components/AskQuestionModal";
 import Hashtag from "../components/Hashtag";
 import { useFAQ } from "../context/FAQContext";
+import LogoutModal from "../components/LogoutModal";
 
 const filters = ["All", "Unanswered", "Most Voted", "Newest"];
 
 function Questions() {
   const { questions, upvoteQuestion, searchQuery, setSearchQuery, pagination, loadPage, backendOnline } = useFAQ();
   const [showModal, setShowModal] = useState(false);
+  const [showLogout, setShowLogout] = useState(false);
   const [activeFilter, setActiveFilter] = useState("All");
   const [selectedCategory, setSelectedCategory] = useState("All Categories");
 
@@ -124,9 +126,9 @@ function Questions() {
 
   return (
     <>
-      <Sidebar />
+      <Sidebar onLogout={() => setShowLogout(true)} />
       <div className="main-wrapper">
-        <Topbar openModal={() => setShowModal(true)} />
+        <Topbar openModal={() => setShowModal(true)} onLogout={() => setShowLogout(true)} />
         <main className="content">
           <h1 className="page-title">All Questions</h1>
 
@@ -399,6 +401,7 @@ function Questions() {
         </main>
       </div>
       <AskQuestionModal open={showModal} onClose={() => setShowModal(false)} />
+      <LogoutModal open={showLogout} onClose={() => setShowLogout(false)} />
     </>
   );
 }

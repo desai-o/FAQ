@@ -5,18 +5,20 @@ import Topbar from "../components/Topbar";
 import AskQuestionModal from "../components/AskQuestionModal";
 import Hashtag from "../components/Hashtag";
 import { useFAQ } from "../context/FAQContext";
+import LogoutModal from "../components/LogoutModal";
 
 function Bookmarks() {
   const [showModal, setShowModal] = useState(false);
+  const [showLogout, setShowLogout] = useState(false);
   const { questions, bookmarkQuestion } = useFAQ();
 
   const bookmarks = questions.filter((q) => q.bookmarked);
 
   return (
     <>
-      <Sidebar />
+      <Sidebar onLogout={() => setShowLogout(true)} />
       <div className="main-wrapper">
-        <Topbar openModal={() => setShowModal(true)} />
+        <Topbar openModal={() => setShowModal(true)} onLogout={() => setShowLogout(true)} />
         <main className="content">
           <h1 className="page-title">My Bookmarks</h1>
           <p className="page-subtitle">Your saved questions for quick reference</p>
@@ -68,6 +70,7 @@ function Bookmarks() {
         </main>
       </div>
       <AskQuestionModal open={showModal} onClose={() => setShowModal(false)} />
+      <LogoutModal open={showLogout} onClose={() => setShowLogout(false)} />
     </>
   );
 }
