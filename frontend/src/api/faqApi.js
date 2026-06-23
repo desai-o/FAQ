@@ -316,3 +316,28 @@ export async function queryGraphQL(query, variables = {}) {
 export async function fetchContributorLeaderboard() {
   return request("/contributors/leaderboard");
 }
+
+export const submitReport = async (reportData) => {
+  try {
+    const token = localStorage.getItem("crowdfaq-token");
+    if (!token) throw new Error("Authentication required to submit reports.");
+    
+    const response = await fetch(`${API_BASE_URL}/reports`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify(reportData)
+    });
+    
+    const result = await response.json();
+    if (!response.ok) {
+      throw new Error(result.error || "Failed to submit report.");
+    }
+    return result;
+  } catch (err) {
+    console.error("submitReport error:", err);
+    throw err;
+  }
+};
