@@ -1089,6 +1089,19 @@ const handleSubmitReply = async () => {
                     <div className="answer-author">
                       <div className="avatar small">{answer.avatar}</div>
                       <strong>{answer.author}</strong>
+                      {answer.authorId && question.authorId && String(answer.authorId) === String(question.authorId) && (
+                        <span style={{ 
+                          marginLeft: "6px", 
+                          fontSize: "10px", 
+                          fontWeight: "bold", 
+                          backgroundColor: "var(--primary-color, #3b82f6)", 
+                          color: "white", 
+                          padding: "2px 6px", 
+                          borderRadius: "4px" 
+                        }}>
+                          OP
+                        </span>
+                      )}
                     </div> 
                     <div
                         style={{
