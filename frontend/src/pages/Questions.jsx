@@ -23,7 +23,7 @@ function Questions() {
 
   // Collect unique tags dynamically from current questions
   const allTags = Array.from(
-    new Set(questions.flatMap((q) => q.hashtags || []))
+    new Set(questions.flatMap((q) => Array.isArray(q.hashtags) ? q.hashtags : []))
   ).filter(Boolean);
 
   const filteredTags = allTags.filter((tag) =>
@@ -79,18 +79,21 @@ function Questions() {
 
   // Apply search query
   if (searchQuery.trim()) {
+    const queryLower = searchQuery.toLowerCase();
     filtered = filtered.filter(
       (q) =>
-        q.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        q.excerpt.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        q.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        q.hashtags.some((tag) => tag.toLowerCase().includes(searchQuery.toLowerCase()))
+        (q.title || "").toLowerCase().includes(queryLower) ||
+        (q.excerpt || "").toLowerCase().includes(queryLower) ||
+        (q.description || "").toLowerCase().includes(queryLower) ||
+        (Array.isArray(q.hashtags) && q.hashtags.some((tag) => 
+          typeof tag === "string" && tag.toLowerCase().includes(queryLower)
+        ))
     );
   }
 
   // Apply category filter (support multiple from advanced search panel)
   if (selectedCategories.length > 0) {
-    filtered = filtered.filter((q) => selectedCategories.includes(q.category));
+    filtered = filtered.filter((q) => q.category && selectedCategories.includes(q.category));
   } else if (selectedCategory !== "All Categories") {
     filtered = filtered.filter((q) => q.category === selectedCategory);
   }
@@ -99,7 +102,7 @@ function Questions() {
   if (selectedTags.length > 0) {
     filtered = filtered.filter((q) =>
       selectedTags.every((tag) =>
-        q.hashtags.map((t) => t.toLowerCase()).includes(tag.toLowerCase())
+        Array.isArray(q.hashtags) && q.hashtags.map((t) => String(t || "").toLowerCase()).includes(tag.toLowerCase())
       )
     );
   }
@@ -115,10 +118,12 @@ function Questions() {
   if (activeFilter === "Unanswered") {
     filtered = filtered.filter((q) => !q.answers || q.answers.length === 0);
   } else if (activeFilter === "Most Voted") {
-    filtered = filtered.sort((a, b) => b.votes - a.votes);
+    filtered = filtered.sort((a, b) => (b.votes || 0) - (a.votes || 0));
   } else if (activeFilter === "Newest") {
     filtered = filtered.sort((a, b) => {
-      return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return dateB - dateA;
     });
   }
 
