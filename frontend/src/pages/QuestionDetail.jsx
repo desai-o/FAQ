@@ -24,7 +24,7 @@ const defaultQuestion = {
 };
 
 function QuestionDetail() {
-  const { questions, upvoteQuestion, bookmarkQuestion, addAnswer, upvoteAnswer, loadingQuestions, refreshQuestions, deleteQuestion, restoreQuestion, removeAnswerLocally, restoreAnswerLocally } = useFAQ();
+  const { questions, upvoteQuestion, bookmarkQuestion, addAnswer, upvoteAnswer, loadingQuestions, refreshQuestions, deleteQuestion, restoreQuestion, removeAnswerLocally, restoreAnswerLocally, toggleAnonymity } = useFAQ();
   const { id } = useParams();
   const [showModal, setShowModal] = useState(false);
   const [replyText, setReplyText] = useState("");
@@ -41,6 +41,15 @@ function QuestionDetail() {
   const [pendingQuestionDelete, setPendingQuestionDelete] = useState(null);
   const [pendingAnswerDelete, setPendingAnswerDelete] = useState(null);
   const [hasGoneBack, setHasGoneBack] = useState(false);
+
+  const [isAnonymousReply, setIsAnonymousReply] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportTarget, setReportTarget] = useState({ type: "", id: "" });
+  const [reportReason, setReportReason] = useState("spam");
+  const [reportDetails, setReportDetails] = useState("");
+  const [reportLoading, setReportLoading] = useState(false);
+  const [reportError, setReportError] = useState("");
+  const [reportSuccess, setReportSuccess] = useState(false);
 
   const [followData, setFollowData] = useState({
     isFollowing: false,
@@ -320,18 +329,49 @@ useEffect(() => {
 
 const handleSubmitReply = async () => {
     if (replyText.trim() && question.id) {
-      console.log("DEBUG sourceType:", question.sourceType, "full question:", question);
       try {
-        const newAnswer = await addAnswer(question.id, replyText, question.sourceType || "faq");
+        const newAnswer = await addAnswer(question.id, replyText, question.sourceType || "faq", isAnonymousReply);
         if (newAnswer) {
           setAnswers((prev) => [newAnswer, ...prev]);
         }
         setReplyText("");
+        setIsAnonymousReply(false);
         setError("");
       } catch (err) {
         console.error("Failed to submit answer:", err);
         setError(err.message || "Failed to post your answer.");
       }
+    }
+  };
+
+  const handleReportSubmit = async () => {
+    if (!user) {
+      setReportError("You must be logged in to report.");
+      return;
+    }
+    setReportLoading(true);
+    setReportError("");
+    try {
+      // Inline fetch for now, or assume we have a faqApi method
+      // We will define it in faqApi.js shortly.
+      const { submitReport } = await import("../api/faqApi");
+      await submitReport({
+        targetType: reportTarget.type,
+        targetId: reportTarget.id,
+        reason: reportReason,
+        details: reportDetails
+      });
+      setReportSuccess(true);
+      setTimeout(() => {
+        setShowReportModal(false);
+        setReportSuccess(false);
+        setReportReason("spam");
+        setReportDetails("");
+      }, 2000);
+    } catch (err) {
+      setReportError(err.message || "Failed to submit report. Please try again later.");
+    } finally {
+      setReportLoading(false);
     }
   };
 
@@ -1049,6 +1089,19 @@ const handleSubmitReply = async () => {
                     <div className="answer-author">
                       <div className="avatar small">{answer.avatar}</div>
                       <strong>{answer.author}</strong>
+                      {answer.authorId && question.authorId && String(answer.authorId) === String(question.authorId) && (
+                        <span style={{ 
+                          marginLeft: "6px", 
+                          fontSize: "10px", 
+                          fontWeight: "bold", 
+                          backgroundColor: "var(--primary-color, #3b82f6)", 
+                          color: "white", 
+                          padding: "2px 6px", 
+                          borderRadius: "4px" 
+                        }}>
+                          OP
+                        </span>
+                      )}
                     </div> 
                     <div
                         style={{
@@ -1077,9 +1130,47 @@ const handleSubmitReply = async () => {
                       >
                         Edited
                       </span>
-                      )}
+                       )}
                          <span className="answer-time">{answer.time}</span>
                       </div>
+                      <button
+                        onClick={() => {
+                          setReportTarget({ type: "answer", id: answer.id });
+                          setShowReportModal(true);
+                        }}
+                        style={{
+                          background: "none",
+                          marginLeft: "auto",
+                          padding: "6px 10px",
+                          borderRadius: "4px",
+                          backgroundColor: "transparent",
+                          color: "#f87171",
+                          border: "1px dashed rgba(248, 113, 113, 0.4)",
+                          cursor: "pointer",
+                          fontWeight: "600",
+                          fontSize: "12px"
+                        }}
+                      >
+                        🚩 Report
+                      </button>
+                      {canEdit(answer) && (
+                        <button
+                          onClick={() => {
+                            toggleAnonymity("answer", answer.id);
+                          }}
+                          style={{
+                            background: "none",
+                            border: "1px solid var(--border)",
+                            color: "var(--text-secondary)",
+                            cursor: "pointer",
+                            fontSize: "12px",
+                            padding: "4px 8px",
+                            borderRadius: "4px"
+                          }}
+                        >
+                          {answer.isAnonymous ? "👁️ De-anonymize" : "🕵️ Anonymize"}
+                        </button>
+                      )}
                       {canEdit(answer) && (
                         <button
                           className="bookmark-btn"
@@ -1202,7 +1293,21 @@ const handleSubmitReply = async () => {
                   value={replyText}
                   onChange={(e) => setReplyText(e.target.value)}
                 />
-                <button className="reply-submit" onClick={handleSubmitReply}>Post Your Answer</button>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "12px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <input
+                      type="checkbox"
+                      id="anon-reply-checkbox"
+                      checked={isAnonymousReply}
+                      onChange={(e) => setIsAnonymousReply(e.target.checked)}
+                      style={{ width: "16px", height: "16px", cursor: "pointer" }}
+                    />
+                    <label htmlFor="anon-reply-checkbox" style={{ fontSize: "14px", cursor: "pointer", color: "var(--text-primary)", userSelect: "none" }}>
+                      Answer anonymously
+                    </label>
+                  </div>
+                  <button className="reply-submit" onClick={handleSubmitReply} style={{ margin: 0 }}>Post Your Answer</button>
+                </div>
               </section>
             </div>
 
@@ -1233,6 +1338,71 @@ const handleSubmitReply = async () => {
         </main>
       </div>
       <AskQuestionModal open={showModal} onClose={() => setShowModal(false)} />
+
+      {/* Report Modal */}
+      {showReportModal && (
+        <div className="modal-overlay active" onClick={() => !reportLoading && setShowReportModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Report {reportTarget.type === "question" ? "Question" : "Answer"}</h2>
+              <button className="modal-close" onClick={() => !reportLoading && setShowReportModal(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              {reportSuccess ? (
+                <div style={{ padding: "20px", textAlign: "center", color: "#10b981" }}>
+                  <div style={{ fontSize: "32px", marginBottom: "10px" }}>✅</div>
+                  <h3 style={{ margin: 0 }}>Report Submitted</h3>
+                  <p style={{ marginTop: "8px", color: "var(--text-secondary)", fontSize: "14px" }}>Thank you for helping keep our community safe.</p>
+                </div>
+              ) : (
+                <>
+                  {reportError && (
+                    <div style={{ color: "#ef4444", marginBottom: "16px", fontSize: "14px", backgroundColor: "rgba(239,68,68,0.1)", padding: "10px", borderRadius: "6px" }}>
+                      ⚠️ {reportError}
+                    </div>
+                  )}
+                  <label style={{ display: "block", marginBottom: "8px", fontWeight: "600", fontSize: "14px" }}>Reason for reporting</label>
+                  <select 
+                    className="modal-input" 
+                    value={reportReason} 
+                    onChange={(e) => setReportReason(e.target.value)}
+                    disabled={reportLoading}
+                    style={{ marginBottom: "16px" }}
+                  >
+                    <option value="spam">Spam or Unsolicited Promotion</option>
+                    <option value="harassment">Harassment or Hate Speech</option>
+                    <option value="inappropriate">Inappropriate Content</option>
+                    <option value="off-topic">Off-topic</option>
+                    <option value="other">Other</option>
+                  </select>
+                  
+                  <label style={{ display: "block", marginBottom: "8px", fontWeight: "600", fontSize: "14px" }}>Additional Details (Optional)</label>
+                  <textarea 
+                    className="modal-input" 
+                    placeholder="Provide any additional context..."
+                    value={reportDetails}
+                    onChange={(e) => setReportDetails(e.target.value)}
+                    disabled={reportLoading}
+                    rows={4}
+                    style={{ resize: "vertical" }}
+                  />
+                  <div className="modal-footer" style={{ marginTop: "24px" }}>
+                    <button className="modal-cancel" onClick={() => setShowReportModal(false)} disabled={reportLoading}>Cancel</button>
+                    <button 
+                      className="modal-submit" 
+                      onClick={handleReportSubmit} 
+                      disabled={reportLoading}
+                      style={{ backgroundColor: "#ef4444", borderColor: "#ef4444" }}
+                    >
+                      {reportLoading ? "Submitting..." : "Submit Report"}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

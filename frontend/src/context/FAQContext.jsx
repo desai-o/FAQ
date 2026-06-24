@@ -314,6 +314,9 @@ function normalizeFaqToQuestion(faq) {
     voted: Boolean(faq.voted),
     bookmarked: Boolean(faq.bookmarked),
     author: faq.author || faq.authorName || "Community Member",
+    authorId: faq.userId || faq.user_id || faq.authorId,
+    isAnonymous: faq.isAnonymous || faq.is_anonymous || false,
+    originalAuthorName: faq.originalAuthorName || faq.authorName || faq.author || "Community Member",
     time: faq.createdAt || faq.created_at || faq.time || "Recently",
     views: faq.views || 0,
     answers: faq.answers || [],
@@ -343,6 +346,9 @@ function normalizeQueryToQuestion(query) {
     voted: Boolean(query.voted),
     bookmarked: Boolean(query.bookmarked),
     author: query.author || query.authorName || "Anonymous",
+    authorId: query.userId || query.user_id || query.authorId,
+    isAnonymous: query.isAnonymous || query.is_anonymous || false,
+    originalAuthorName: query.originalAuthorName || query.authorName || query.author || "Anonymous",
     time: query.createdAt || query.created_at || query.time || "Recently",
     views: query.views || 0,
     answers: query.answers || [],
@@ -370,7 +376,10 @@ function normalizeLocalQuestion(question) {
     votes: question.votes || 0,
     voted: Boolean(question.voted),
     bookmarked: Boolean(question.bookmarked),
-    author: question.author || question.authorName || "Anonymous",
+    author: question.author || question.authorName || "Guest",
+    authorId: question.userId || question.user_id || question.authorId,
+    isAnonymous: question.isAnonymous || question.is_anonymous || false,
+    originalAuthorName: question.originalAuthorName || question.authorName || question.author || "Guest",
     time: question.createdAt || question.created_at || question.time || "Just now",
     views: question.views || 0,
     answers: question.answers || [],
@@ -508,10 +517,28 @@ export function FAQProvider({ children }) {
     }
   }
 
-  const addQuestion = async (title, category, description, hashtagsString) => {
-    requireLoggedInAction("ask a question");
+  // ── Anonymous rate-limit ────────────────────────────────────────────────────
+  // Stored as a JSON array of timestamps in localStorage.
+  // Max 3 anonymous posts per 24h, enforced client-side.
+  const ANON_TIMESTAMPS_KEY = "crowdfaq_anon_timestamps";
+  const checkAnonymousRateLimit = () => {
+    const now = Date.now();
+    let timestamps = [];
+    try {
+      timestamps = JSON.parse(localStorage.getItem(ANON_TIMESTAMPS_KEY) || "[]");
+    } catch { timestamps = []; }
+    const recent = timestamps.filter(t => now - t < 24 * 60 * 60 * 1000);
+    if (recent.length >= 3) {
+      throw new Error("Rate limit: You can only make 3 anonymous posts per 24 hours.");
+    }
+    localStorage.setItem(ANON_TIMESTAMPS_KEY, JSON.stringify([...recent, now]));
+  };
 
-    const authorName = user ? user.name : "Guest";
+  const addQuestion = async (title, category, description, hashtagsString, isAnonymous = false) => {
+    requireLoggedInAction("ask a question");
+    if (isAnonymous) checkAnonymousRateLimit();
+
+    const authorName = isAnonymous ? "Anonymous User" : (user ? user.name : "Guest");
 
     const tempQuestion = normalizeLocalQuestion({
       id: `local-${crypto.randomUUID()}`,
@@ -526,6 +553,9 @@ export function FAQProvider({ children }) {
       pendingSync: true,
       author: authorName,
       authorName: authorName,
+      authorId: user?.id || "guest",
+      isAnonymous: isAnonymous,
+      originalAuthorName: isAnonymous ? (user?.name || "Guest") : authorName,
       createdAt: new Date().toISOString()
     });
 
@@ -545,7 +575,8 @@ export function FAQProvider({ children }) {
         question: title,
         description,
         category,
-        tags: normalizeTags(hashtagsString)
+        tags: normalizeTags(hashtagsString),
+        isAnonymous
       });
 
       const serverQuestion = normalizeQueryToQuestion(response?.data || response);
@@ -698,14 +729,16 @@ const restoreAnswerLocally = (questionId, answer) => {
       throw err;
     }
   };
-  const addAnswer = async (questionId, content, sourceType = "faq") => {
+  const addAnswer = async (questionId, content, sourceType = "faq", isAnonymous = false) => {
     requireLoggedInAction("submit an answer");
     const cleanContent = content.trim();
     if (!cleanContent) return null;
+    if (isAnonymous) checkAnonymousRateLimit();
 
-    const author = user?.name || "Community Member";
+    const originalAuthorName = user?.name || "Community Member";
+    const author = isAnonymous ? "Anonymous User" : originalAuthorName;
 
-    const payload = { content: cleanContent, author };
+    const payload = { content: cleanContent, author, isAnonymous };
     if (sourceType === "query") {
       payload.queryId = questionId;
     } else {
@@ -720,8 +753,11 @@ const restoreAnswerLocally = (questionId, answer) => {
       const newAnswer = {
         id: savedAnswer._id || savedAnswer.id,
         userId: savedAnswer.userId || savedAnswer.user_id || user?.id,
-        author: savedAnswer.author || author,
-        avatar: (savedAnswer.author || author).charAt(0).toUpperCase(),
+        authorId: user?.id,
+        originalAuthorName,
+        isAnonymous,
+        author: isAnonymous ? "Anonymous User" : (savedAnswer.author || originalAuthorName),
+        avatar: isAnonymous ? "🕵️" : (savedAnswer.author || originalAuthorName).charAt(0).toUpperCase(),
         content: savedAnswer.content,
         votes: savedAnswer.votes || 0,
         time: "Just now",
@@ -746,8 +782,11 @@ const restoreAnswerLocally = (questionId, answer) => {
 
       const fallbackAnswer = {
         id: crypto.randomUUID(),
+        authorId: user?.id,
+        originalAuthorName,
+        isAnonymous,
         author,
-        avatar: author.charAt(0).toUpperCase(),
+        avatar: isAnonymous ? "🕵️" : author.charAt(0).toUpperCase(),
         content: cleanContent,
         votes: 0,
         time: "Just now",
@@ -768,6 +807,38 @@ const restoreAnswerLocally = (questionId, answer) => {
 
       return fallbackAnswer;
     }
+  };
+
+  const toggleAnonymity = async (itemId, itemType = "question") => {
+    requireLoggedInAction("toggle anonymity");
+    setQuestions((prev) => prev.map((q) => {
+      if (itemType === "question" && String(q.id) === String(itemId)) {
+        const newIsAnon = !q.isAnonymous;
+        return {
+          ...q,
+          isAnonymous: newIsAnon,
+          author: newIsAnon ? "Anonymous User" : (q.originalAuthorName || user?.name || "Community Member")
+        };
+      }
+      if (itemType === "answer") {
+        return {
+          ...q,
+          answers: (q.answers || []).map(ans => {
+            if (String(ans.id) === String(itemId)) {
+              const newIsAnon = !ans.isAnonymous;
+              return {
+                ...ans,
+                isAnonymous: newIsAnon,
+                author: newIsAnon ? "Anonymous User" : (ans.originalAuthorName || user?.name || "Community Member"),
+                avatar: newIsAnon ? "🕵️" : (ans.originalAuthorName || user?.name || "C").charAt(0).toUpperCase()
+              };
+            }
+            return ans;
+          })
+        };
+      }
+      return q;
+    }));
   };
 
   const upvoteAnswer = async (questionId, answerId) => {
@@ -848,6 +919,7 @@ const restoreAnswerLocally = (questionId, answer) => {
         restoreAnswerLocally,
         addAnswer,
         upvoteAnswer,
+        toggleAnonymity,
         backendOnline,
         loadingQuestions,
         pagination,

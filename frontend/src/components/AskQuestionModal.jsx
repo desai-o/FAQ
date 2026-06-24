@@ -36,6 +36,8 @@ function AskQuestionModal({ open, onClose }) {
     return () => clearTimeout(delayDebounceFn);
   }, [title]);
 
+  const [isAnonymous, setIsAnonymous] = useState(false);
+
   useEffect(() => {
     const handleEsc = (e) => {
       if (e.key === "Escape") onClose();
@@ -43,6 +45,7 @@ function AskQuestionModal({ open, onClose }) {
     if (open) {
       document.addEventListener("keydown", handleEsc);
       document.body.style.overflow = "hidden";
+      setIsAnonymous(false); // Reset on open
     }
     return () => {
       document.removeEventListener("keydown", handleEsc);
@@ -69,7 +72,7 @@ function AskQuestionModal({ open, onClose }) {
     }
 
     try {
-      await addQuestion(title, category, description, hashtags || "");
+      await addQuestion(title, category, description, hashtags || "", isAnonymous);
       setTitle("");
       setCategory("");
       setDescription("");
@@ -169,6 +172,19 @@ function AskQuestionModal({ open, onClose }) {
             value={hashtags}
             onChange={(e) => setHashtags(e.target.value)}
           />
+
+          <div style={{ marginTop: "16px", display: "flex", alignItems: "center", gap: "8px" }}>
+            <input
+              type="checkbox"
+              id="anonymous-checkbox"
+              checked={isAnonymous}
+              onChange={(e) => setIsAnonymous(e.target.checked)}
+              style={{ width: "16px", height: "16px", cursor: "pointer" }}
+            />
+            <label htmlFor="anonymous-checkbox" style={{ fontSize: "14px", cursor: "pointer", color: "var(--text-primary)", userSelect: "none" }}>
+              Post anonymously
+            </label>
+          </div>
         </div>
 
         <div className="modal-footer">
