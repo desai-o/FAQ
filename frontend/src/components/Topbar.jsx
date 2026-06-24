@@ -106,6 +106,7 @@ function Topbar({ openModal }) {
 
   function handleSearchSubmit(event) {
     event.preventDefault();
+    navigate("/questions");
   }
 
   return (
