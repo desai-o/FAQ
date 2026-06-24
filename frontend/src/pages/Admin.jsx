@@ -13,6 +13,7 @@ import {
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
 import AskQuestionModal from "../components/AskQuestionModal";
+import ModerationDashboard from "../components/moderation/ModerationDashboard";
 
 export default function Admin() {
   const [activeTab, setActiveTab] = useState("Overview");
@@ -206,7 +207,7 @@ export default function Admin() {
 
           {/* Console Sub-Tabs */}
           <div style={{ display: "flex", borderBottom: "1px solid var(--border)", gap: "16px", marginBottom: "24px" }}>
-            {["Overview", "Import / Export", "Moderation Queue", "Knowledge Gaps"].map((tab) => (
+            {["Overview", "Import / Export", "Moderation Queue", "Content Review", "Knowledge Gaps"].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -556,6 +557,11 @@ export default function Admin() {
                     </div>
                   </div>
                 </div>
+              )}
+
+              {/* Tab 5: Content Review */}
+              {activeTab === "Content Review" && (
+                <ModerationDashboard />
               )}
             </>
           )}
