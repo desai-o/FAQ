@@ -2097,6 +2097,9 @@ input, select, textarea {
   cursor: pointer;
   transition: all 0.15s;
   color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .bookmark-btn:hover {
@@ -2108,6 +2111,51 @@ input, select, textarea {
   background: var(--bookmark-active-bg);
   border-color: var(--accent-yellow);
   color: var(--bookmark-active-color);
+}
+
+/* Report button - matches bookmark-btn dimensions with red danger styling */
+.report-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  color: var(--accent-red);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.report-btn:hover {
+  background: var(--remove-btn-hover-bg);
+  border-color: var(--accent-red);
+  color: var(--accent-red);
+}
+
+.report-btn::after {
+  content: "Report this answer";
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1a1a1a;
+  color: #fff;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+  z-index: 10;
+}
+
+.report-btn:hover::after {
+  opacity: 1;
 }
 
 /* Answers */

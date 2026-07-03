@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useParams } from "react-router-dom";
+import { Eye, EyeOff } from "lucide-react";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
 import AskQuestionModal from "../components/AskQuestionModal";
@@ -1208,24 +1209,13 @@ const handleSubmitReply = async () => {
                          <span className="answer-time">{answer.time}</span>
                       </div>
                       <button
+                        className="report-btn"
                         onClick={() => {
                           setReportTarget({ type: "answer", id: answer.id });
                           setShowReportModal(true);
                         }}
-                        style={{
-                          background: "none",
-                          marginLeft: "auto",
-                          padding: "6px 10px",
-                          borderRadius: "4px",
-                          backgroundColor: "transparent",
-                          color: "#f87171",
-                          border: "1px dashed rgba(248, 113, 113, 0.4)",
-                          cursor: "pointer",
-                          fontWeight: "600",
-                          fontSize: "12px"
-                        }}
                       >
-                        🚩 Report
+                        🚩
                       </button>
                       {canEdit(answer) && (
                         <button
@@ -1246,17 +1236,9 @@ const handleSubmitReply = async () => {
                               )
                             );
                           }}
-                          style={{
-                            background: "none",
-                            border: "1px solid var(--border)",
-                            color: "var(--text-secondary)",
-                            cursor: "pointer",
-                            fontSize: "12px",
-                            padding: "4px 8px",
-                            borderRadius: "4px"
-                          }}
+                          className="bookmark-btn"
                         >
-                          {answer.isAnonymous ? "👁️ De-anonymize" : "🕵️ Anonymize"}
+                          {answer.isAnonymous ? <><Eye size={14} /> De-anonymize</> : <><EyeOff size={14} /> Anonymize</>}
                         </button>
                       )}
                       {canEdit(answer) && (
