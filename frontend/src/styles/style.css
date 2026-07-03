@@ -283,14 +283,14 @@ input, select, textarea {
 
 .logo-icon {
   font-size: 20px;
-  color: var(--text-white);
+  color: var(--text-primary);
 }
 
 .logo-text {
   font-size: 18px;
   font-weight: 700;
   letter-spacing: -0.3px;
-  color: var(--text-white);
+  color: var(--text-primary);
 }
 
 /* Dark mode logo */
@@ -578,6 +578,8 @@ input, select, textarea {
   background: var(--accent-blue, #3b82f6);
   padding: 2px 8px;
   border-radius: 50px;
+  margin-left: 6px;
+  line-height: 1;
 }
 
 .notification-center-header-actions {
@@ -2095,6 +2097,9 @@ input, select, textarea {
   cursor: pointer;
   transition: all 0.15s;
   color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .bookmark-btn:hover {
@@ -2106,6 +2111,51 @@ input, select, textarea {
   background: var(--bookmark-active-bg);
   border-color: var(--accent-yellow);
   color: var(--bookmark-active-color);
+}
+
+/* Report button - matches bookmark-btn dimensions with red danger styling */
+.report-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  color: var(--accent-red);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.report-btn:hover {
+  background: var(--remove-btn-hover-bg);
+  border-color: var(--accent-red);
+  color: var(--accent-red);
+}
+
+.report-btn::after {
+  content: "Report this answer";
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1a1a1a;
+  color: #fff;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+  z-index: 10;
+}
+
+.report-btn:hover::after {
+  opacity: 1;
 }
 
 /* Answers */
@@ -2267,6 +2317,8 @@ input, select, textarea {
   color: #fff;
   padding: 2px 8px;
   border-radius: 50px;
+  margin-left: 6px;
+  line-height: 1;
 }
 
 .notification-center-header-actions {
@@ -6586,14 +6638,17 @@ html:has(.landing-container) {
 .notification-center-header-left {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  flex-shrink: 0;
 }
 
 .notification-center-title {
   margin: 0;
+  margin-right: 4px;
   font-size: 16px;
   font-weight: 700;
   color: var(--text-primary);
+  white-space: nowrap;
 }
 
 .notification-center-unread-badge {
@@ -6608,6 +6663,8 @@ html:has(.landing-container) {
   display: flex;
   align-items: center;
   justify-content: center;
+  margin-left: 6px;
+  line-height: 1;
 }
 
 .notification-center-header-actions {
@@ -6649,7 +6706,7 @@ html:has(.landing-container) {
 .notification-search {
   position: relative;
   padding: 12px 16px;
-  border-bottom: 1px solid var(--border);
+  margin: 8px 0;
   flex-shrink: 0;
 }
 
@@ -6704,7 +6761,7 @@ html:has(.landing-container) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 16px;
+  padding: 10px 16px 16px;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
@@ -6713,11 +6770,22 @@ html:has(.landing-container) {
   display: flex;
   gap: 6px;
   overflow-x: auto;
-  scrollbar-width: none;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+  margin-bottom: 8px;
 }
 
 .notification-filter-chips::-webkit-scrollbar {
-  display: none;
+  height: 4px;
+}
+
+.notification-filter-chips::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.notification-filter-chips::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 2px;
 }
 
 .notification-filter-chip {
@@ -6756,6 +6824,7 @@ html:has(.landing-container) {
   text-transform: uppercase;
   color: var(--text-light);
   letter-spacing: 0.5px;
+  margin-left: 4px;
 }
 
 .notification-sort-select {
@@ -6776,7 +6845,7 @@ html:has(.landing-container) {
   align-items: center;
   justify-content: space-between;
   padding: 10px 16px;
-  background: var(--bg-page);
+  background: var(--bg-white);
   border-bottom: 1px solid var(--border);
 }
 
@@ -6785,7 +6854,7 @@ html:has(.landing-container) {
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
-  color: var(--text-secondary);
+  color: var(--text-primary);
   letter-spacing: 0.5px;
 }
 
