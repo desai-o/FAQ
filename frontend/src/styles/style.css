@@ -578,6 +578,8 @@ input, select, textarea {
   background: var(--accent-blue, #3b82f6);
   padding: 2px 8px;
   border-radius: 50px;
+  margin-left: 6px;
+  line-height: 1;
 }
 
 .notification-center-header-actions {
@@ -2267,6 +2269,8 @@ input, select, textarea {
   color: #fff;
   padding: 2px 8px;
   border-radius: 50px;
+  margin-left: 6px;
+  line-height: 1;
 }
 
 .notification-center-header-actions {
@@ -6586,14 +6590,17 @@ html:has(.landing-container) {
 .notification-center-header-left {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  flex-shrink: 0;
 }
 
 .notification-center-title {
   margin: 0;
+  margin-right: 4px;
   font-size: 16px;
   font-weight: 700;
   color: var(--text-primary);
+  white-space: nowrap;
 }
 
 .notification-center-unread-badge {
@@ -6608,6 +6615,8 @@ html:has(.landing-container) {
   display: flex;
   align-items: center;
   justify-content: center;
+  margin-left: 6px;
+  line-height: 1;
 }
 
 .notification-center-header-actions {
@@ -6704,7 +6713,7 @@ html:has(.landing-container) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 16px;
+  padding: 10px 16px 16px;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
@@ -6714,10 +6723,11 @@ html:has(.landing-container) {
   gap: 6px;
   overflow-x: auto;
   scrollbar-width: none;
+  margin-bottom: 8px;
 }
 
 .notification-filter-chips::-webkit-scrollbar {
-  display: none;
+    display: none;
 }
 
 .notification-filter-chip {
