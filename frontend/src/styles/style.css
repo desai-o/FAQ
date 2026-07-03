@@ -283,14 +283,14 @@ input, select, textarea {
 
 .logo-icon {
   font-size: 20px;
-  color: var(--text-white);
+  color: var(--text-primary);
 }
 
 .logo-text {
   font-size: 18px;
   font-weight: 700;
   letter-spacing: -0.3px;
-  color: var(--text-white);
+  color: var(--text-primary);
 }
 
 /* Dark mode logo */
