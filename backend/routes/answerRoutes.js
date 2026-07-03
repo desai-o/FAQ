@@ -32,7 +32,8 @@ const createAnswerSchema = z.object({
 
 const updateAnswerSchema = z.object({
   body: z.object({
-    content: z.string().trim().min(1).max(5000)
+    content: z.string().trim().min(1).max(5000).optional(),
+    isAnonymous: z.boolean().optional()
   }),
   params: z.object({
     id: z.string().min(1)
@@ -232,9 +233,10 @@ router.post("/", requireAuth, writeLimiter, validate(createAnswerSchema), async 
         user_id,
         author_name,
         synced_to_mongo,
-        moderation_status
+        moderation_status,
+        is_anonymous
         )
-        VALUES (?, ?, ?, ?, ?, ?, 0, 'approved')
+        VALUES (?, ?, ?, ?, ?, ?, 0, 'approved', 0)
         `,
         questionId || null,
         queryId || null,
@@ -537,7 +539,7 @@ router.delete("/:id", requireAuth, writeLimiter, async (req, res) => {
 // Edit answer
 router.patch("/:id", requireAuth, writeLimiter, validate(updateAnswerSchema), async (req, res) => {
   try {
-    const { content } = req.body;
+    const { content, isAnonymous } = req.body;
 
     if (isMongoAvailable()) {
       const answer = await Answer.findById(req.params.id);
@@ -556,7 +558,8 @@ router.patch("/:id", requireAuth, writeLimiter, validate(updateAnswerSchema), as
         authorName: req.user.name
       });
 
-      answer.content = content.trim();
+      if (content !== undefined) answer.content = content.trim();
+      if (isAnonymous !== undefined) answer.isAnonymous = isAnonymous;
       await answer.save();
 
       return success(res, { storage: "mongodb", data: answer });
@@ -579,15 +582,25 @@ router.patch("/:id", requireAuth, writeLimiter, validate(updateAnswerSchema), as
       authorName: req.user.name
     });
 
+    // Build dynamic update query
+    const updates = [];
+    const params = [];
+    
+    if (content !== undefined) {
+      updates.push("content = ?");
+      params.push(content.trim());
+    }
+    if (isAnonymous !== undefined) {
+      updates.push("is_anonymous = ?");
+      params.push(isAnonymous ? 1 : 0);
+    }
+    updates.push("updated_at = CURRENT_TIMESTAMP");
+    
+    params.push(req.params.id);
+
     await db.run(
-      `
-      UPDATE answers
-      SET content = ?,
-          updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-      `,
-      content.trim(),
-      req.params.id
+      `UPDATE answers SET ${updates.join(", ")} WHERE id = ?`,
+      ...params
     );
 
     const updated = await db.get("SELECT * FROM answers WHERE id = ?", req.params.id);

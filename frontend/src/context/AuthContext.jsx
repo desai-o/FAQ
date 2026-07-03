@@ -62,9 +62,22 @@ export function AuthProvider({ children }) {
       }
 
       const token = data.meta?.token || data.token;
-      const user = data.meta?.user || data.user || data.data;
       localStorage.setItem("crowdfaq-token", token);
-      setUser(user);
+
+      // Fetch full user profile to get role and all user data
+      const meResponse = await fetch(`${apiBaseUrl}/auth/me`, {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      
+      if (meResponse.ok) {
+        const meData = await meResponse.json();
+        setUser(meData.user || meData.data);
+      } else {
+        // Fallback: use user from login response
+        const user = data.meta?.user || data.user || data.data;
+        setUser(user);
+      }
+      
       return { success: true };
     } catch (err) {
       setError(err.message);

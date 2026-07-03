@@ -171,3 +171,59 @@
 .profile-dropdown-menu .logout-btn svg {
   color: var(--accent-red, #ef4444);
 }
+
+/* Dark mode overrides */
+[data-theme="dark"] .profile-dropdown {
+  background: #18181b;
+  border-color: #2a2d3e;
+}
+
+[data-theme="dark"] .profile-dropdown-avatar {
+  background: var(--accent-blue);
+}
+
+[data-theme="dark"] .profile-dropdown-info h4 {
+  color: #f0f0f0;
+}
+
+[data-theme="dark"] .profile-dropdown-info p {
+  color: #9ca3af;
+}
+
+[data-theme="dark"] .profile-dropdown-stats {
+  background: #0f0f0f;
+  border-color: #2a2d3e;
+}
+
+[data-theme="dark"] .profile-stat-box:not(:last-child) {
+  border-color: #2a2d3e;
+}
+
+[data-theme="dark"] .stat-val {
+  color: #f0f0f0;
+}
+
+[data-theme="dark"] .stat-lbl {
+  color: #9ca3af;
+}
+
+[data-theme="dark"] .profile-dropdown-menu a {
+  color: #e5e5e5;
+}
+
+[data-theme="dark"] .profile-dropdown-menu a:hover {
+  background: #242424;
+  color: #ffffff;
+}
+
+[data-theme="dark"] .profile-dropdown-menu a svg {
+  color: #9ca3af;
+}
+
+[data-theme="dark"] .profile-dropdown-menu a:hover svg {
+  color: #ffffff;
+}
+
+[data-theme="dark"] .profile-dropdown-menu .dropdown-divider {
+  background: #2a2d3e;
+}

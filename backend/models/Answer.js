@@ -60,6 +60,10 @@ const answerSchema = new mongoose.Schema(
       type: String,
       default: "approved",
       enum: ["auto_clear", "needs_review", "escalated", "approved", "rejected"]
+    },
+    isAnonymous: {
+      type: Boolean,
+      default: false
     }
   },
   {

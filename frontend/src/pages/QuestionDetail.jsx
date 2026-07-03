@@ -6,6 +6,7 @@ import AskQuestionModal from "../components/AskQuestionModal";
 import Hashtag from "../components/Hashtag";
 import { useFAQ } from "../context/FAQContext";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
 import { deleteFaq, deleteQuery, updateAnswer, deleteAnswer, updateQuery, followResource, unfollowResource, muteFollow, fetchAnswers, fetchFaqTranslations, createFaqTranslation, createBounty, awardBounty, fetchBounties } from "../api/faqApi";
 import ErrorToast from "../components/ErrorToast";
 
@@ -60,16 +61,19 @@ function QuestionDetail() {
   const followMenuRef = useRef(null);
 
   const { user } = useAuth();
+  const { theme } = useTheme();
   const [error, setError] = useState("");
   const [answers, setAnswers] = useState([]);
 
   const [isEditingQuestion, setIsEditingQuestion] = useState(false);
   const [editQuestionData, setEditQuestionData] = useState({
-  title: "",
-  description: "",
-  category: "",
-  hashtags: []
-});
+    title: "",
+    description: "",
+    category: "",
+    hashtags: []
+  });
+  // Separate state for the current tag being typed in edit mode
+  const [currentTagInput, setCurrentTagInput] = useState("");
 
   const [editingAnswerId, setEditingAnswerId] = useState(null);
   const [editAnswerContent, setEditAnswerContent] = useState("");
@@ -83,20 +87,26 @@ function QuestionDetail() {
     try {
       const newOffset = page * answersPagination.limit;
       const res = await fetchAnswers(id, answersPagination.limit, newOffset);
+      console.log("DEBUG loadAnswers - raw response:", JSON.stringify(res.data, null, 2));
       if (res.data) {
-        const mapped = res.data.map((ans) => ({
-          id: ans._id || ans.id,
-          userId: ans.userId || ans.user_id,
-
-          author: ans.author || ans.authorName || "Community Member",
-          avatar: (ans.author || "C")[0].toUpperCase(),
-          content: ans.content,
-          createdAt: ans.createdAt,
-          updatedAt: ans.updatedAt,
-          votes: ans.votes || 0,
-          time: ans.createdAt || ans.created_at || "Recently",
-          isBest: Boolean(ans.isBest || ans.is_best)
-        }));
+        console.log("DEBUG loadAnswers - first answer raw:", JSON.stringify(res.data[0], null, 2));
+        const mapped = res.data.map((ans) => {
+          const rawIsAnon = ans.isAnonymous || ans.is_anonymous || false;
+          return {
+            id: ans._id || ans.id,
+            userId: ans.userId || ans.user_id,
+            isAnonymous: rawIsAnon,
+            author: rawIsAnon ? "Anonymous User" : (ans.author || ans.authorName || "Community Member"),
+            originalAuthorName: ans.authorName || ans.author || "Community Member",
+            avatar: rawIsAnon ? "🕵️" : (ans.author || ans.authorName || "C")[0].toUpperCase(),
+            content: ans.content,
+            createdAt: ans.createdAt,
+            updatedAt: ans.updatedAt,
+            votes: ans.votes || 0,
+            time: ans.createdAt || ans.created_at || "Recently",
+            isBest: Boolean(ans.isBest || ans.is_best)
+          };
+        });
         setAnswers(mapped);
         if (res.meta?.pagination) {
           setAnswersPagination(res.meta.pagination);
@@ -708,8 +718,8 @@ const handleSubmitReply = async () => {
                       padding: "12px",
                       border: "1px solid #444",
                       borderRadius: "8px",
-                      background: "#1e1e1e",
-                      color: "#eee"
+                      background: theme === "dark" ? "#1e1e1e" : "#f8f8f8",
+                      color: theme === "dark" ? "#eee" : "#111"
                     }}
                   >
                     <strong>AI Summary</strong>
@@ -764,27 +774,88 @@ const handleSubmitReply = async () => {
                       <option>Mathematics</option>
                       </select>
 
-                      <input
-                         type="text"
-                         value={editQuestionData.hashtags.join(", ")}
-                         onChange={(e) =>
-                           setEditQuestionData({
-                             ...editQuestionData,
-                             hashtags: e.target.value
-                               .split(",")
-                               .map(tag => tag.trim())
-                               .filter(tag => tag)
-                           })
-                         }
-                         placeholder="e.g. AI, machine-learning, python"
-                         style={{
-                           width: "100%",
-                           padding: "12px",
-                           marginTop: "12px",
-                           marginBottom: "12px",
-                           borderRadius: "8px"
-                         }}
-                       />
+                      {/* Tag input with comma/Enter key support */}
+                      <div style={{ marginTop: "12px", marginBottom: "12px" }}>
+                        <label style={{ display: "block", marginBottom: "8px", fontSize: "14px", fontWeight: "500" }}>
+                          Tags
+                        </label>
+                        
+                        {/* Display existing tags as removable chips */}
+                        {editQuestionData.hashtags.length > 0 && (
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "8px" }}>
+                            {editQuestionData.hashtags.map((tag, index) => (
+                              <span
+                                key={index}
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: "6px",
+                                  padding: "4px 10px",
+                                  backgroundColor: "var(--primary-color, #3b82f6)",
+                                  color: "#fff",
+                                  borderRadius: "16px",
+                                  fontSize: "13px"
+                                }}
+                              >
+                                {tag}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditQuestionData({
+                                      ...editQuestionData,
+                                      hashtags: editQuestionData.hashtags.filter((_, i) => i !== index)
+                                    });
+                                  }}
+                                  style={{
+                                    background: "none",
+                                    border: "none",
+                                    color: "#fff",
+                                    cursor: "pointer",
+                                    padding: "0",
+                                    fontSize: "16px",
+                                    lineHeight: "1",
+                                    opacity: 0.8
+                                  }}
+                                >
+                                  ×
+                                </button>
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        
+                        <input
+                          type="text"
+                          value={currentTagInput}
+                          onChange={(e) => setCurrentTagInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "," || e.key === "Enter") {
+                              e.preventDefault();
+                              const newTag = currentTagInput.trim().replace(/^,|,$/g, "");
+                              if (newTag) {
+                                // Check for duplicates (case-insensitive)
+                                const isDuplicate = editQuestionData.hashtags.some(
+                                  t => t.toLowerCase() === newTag.toLowerCase()
+                                );
+                                if (!isDuplicate) {
+                                  setEditQuestionData({
+                                    ...editQuestionData,
+                                    hashtags: [...editQuestionData.hashtags, newTag]
+                                  });
+                                }
+                              }
+                              setCurrentTagInput("");
+                            }
+                          }}
+                          placeholder="Type a tag and press comma or Enter to add"
+                          style={{
+                            width: "100%",
+                            padding: "12px",
+                            borderRadius: "8px",
+                            border: "1px solid var(--border)"
+                          }}
+                        />
+                      </div>
 
                     <textarea
                      value={editQuestionData.description}
@@ -849,7 +920,7 @@ const handleSubmitReply = async () => {
                           category: question.category || "",
                           hashtags: question.hashtags || []
                       });
-
+                      setCurrentTagInput("");
                       setIsEditingQuestion(true);
                     }}
                       >
@@ -930,7 +1001,9 @@ const handleSubmitReply = async () => {
                         {showFollowMenu && (
                           <div style={{
                             position: "absolute", top: "100%", right: 0, marginTop: "4px",
-                            background: "#fff", border: "1px solid #e5e5e5", borderRadius: "6px",
+                            background: theme === "dark" ? "#18181b" : "#fff",
+                            border: theme === "dark" ? "1px solid #2a2d3e" : "1px solid #e5e5e5",
+                            borderRadius: "6px",
                             boxShadow: "0 4px 12px rgba(0,0,0,0.1)", zIndex: 10, width: "160px",
                             display: "flex", flexDirection: "column", padding: "4px 0"
                           }}>
@@ -938,9 +1011,10 @@ const handleSubmitReply = async () => {
                               onClick={handleMuteToggle}
                               style={{
                                 background: "none", border: "none", width: "100%", textAlign: "left",
-                                padding: "8px 12px", fontSize: "13px", cursor: "pointer", color: "#1a1a1a"
+                                padding: "8px 12px", fontSize: "13px", cursor: "pointer",
+                                color: theme === "dark" ? "#e5e5e5" : "#1a1a1a"
                               }}
-                              onMouseOver={e => e.currentTarget.style.background = "#f5f5f5"}
+                              onMouseOver={e => e.currentTarget.style.background = theme === "dark" ? "#242424" : "#f5f5f5"}
                               onMouseOut={e => e.currentTarget.style.background = "none"}
                             >
                               {followData.isMuted ? "Unmute notifications" : "Mute notifications"}
@@ -951,7 +1025,7 @@ const handleSubmitReply = async () => {
                                 background: "none", border: "none", width: "100%", textAlign: "left",
                                 padding: "8px 12px", fontSize: "13px", cursor: "pointer", color: "#ef4444"
                               }}
-                              onMouseOver={e => e.currentTarget.style.background = "#f5f5f5"}
+                              onMouseOver={e => e.currentTarget.style.background = theme === "dark" ? "#242424" : "#f5f5f5"}
                               onMouseOut={e => e.currentTarget.style.background = "none"}
                             >
                               Unfollow
@@ -1155,8 +1229,22 @@ const handleSubmitReply = async () => {
                       </button>
                       {canEdit(answer) && (
                         <button
-                          onClick={() => {
-                            toggleAnonymity("answer", answer.id);
+                          onClick={async () => {
+                            // Pass current state explicitly to avoid stale reads
+                            await toggleAnonymity(answer.id, "answer", answer.isAnonymous);
+                            // Also update local answers state
+                            setAnswers((prev) =>
+                              prev.map((a) =>
+                                String(a.id) === String(answer.id)
+                                  ? {
+                                      ...a,
+                                      isAnonymous: !a.isAnonymous,
+                                      author: !a.isAnonymous ? "Anonymous User" : (a.originalAuthorName || user?.name || "Community Member"),
+                                      avatar: !a.isAnonymous ? "🕵️" : (a.originalAuthorName || user?.name || "C").charAt(0).toUpperCase()
+                                    }
+                                  : a
+                              )
+                            );
                           }}
                           style={{
                             background: "none",

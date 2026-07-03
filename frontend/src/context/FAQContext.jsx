@@ -6,7 +6,11 @@ import {
   fetchQueries,
   submitAnswer,
   toggleVote,
-  toggleBookmarkApi
+  toggleBookmarkApi,
+  fetchBookmarks,
+  updateAnswer,
+  updateFaq,
+  updateQuery
 } from "../api/faqApi";
 
 const FAQContext = createContext();
@@ -472,6 +476,9 @@ export function FAQProvider({ children }) {
       writeJsonArray(QUESTIONS_CACHE_KEY, merged);
       setBackendOnline(true);
 
+      // After loading questions, merge in bookmark status from backend
+      await loadBookmarks();
+
       const faqTotal = faqResult.status === "fulfilled" && (faqResult.value.meta?.pagination?.total || faqResult.value?.pagination?.total || 0) || 0;
       const queryTotal = queryResult.status === "fulfilled" && (queryResult.value.meta?.pagination?.total || queryResult.value?.pagination?.total || 0) || 0;
       const total = faqTotal + queryTotal;
@@ -506,10 +513,42 @@ export function FAQProvider({ children }) {
     }
   };
 
+  // Load bookmarks from backend and merge into questions state
+  const loadBookmarks = async () => {
+    if (!user?.id || user.id === "anonymous") return;
+    
+    try {
+      const response = await fetchBookmarks(user.id);
+      const bookmarksData = response?.data || [];
+      
+      // Extract question IDs from bookmarks
+      const bookmarkedQuestionIds = new Set(
+        bookmarksData.map(b => String(b.questionId || b.question_id || b._id))
+      );
+      
+      // Merge bookmark status into questions
+      setQuestions(prev => 
+        prev.map(q => ({
+          ...q,
+          bookmarked: bookmarkedQuestionIds.has(String(q.id))
+        }))
+      );
+    } catch (error) {
+      console.warn("Failed to load bookmarks:", error);
+    }
+  };
+
   // Sync with Backend database on mount
   useEffect(() => {
     loadQuestionsFromAllSources();
   }, []);
+
+  // Load bookmarks when user changes
+  useEffect(() => {
+    if (user?.id && user.id !== "anonymous") {
+      loadBookmarks();
+    }
+  }, [user?.id]);
 
   function requireLoggedInAction(actionName) {
     if (!user?.id || user.id === "anonymous") {
@@ -809,11 +848,37 @@ const restoreAnswerLocally = (questionId, answer) => {
     }
   };
 
-  const toggleAnonymity = async (itemId, itemType = "question") => {
+  const toggleAnonymity = async (itemId, itemType = "question", currentIsAnon = null) => {
     requireLoggedInAction("toggle anonymity");
+    
+    // If currentIsAnon not provided, look it up from context
+    if (currentIsAnon === null) {
+      const currentQ = questions.find((q) => 
+        itemType === "question" ? String(q.id) === String(itemId) : true
+      );
+      
+      if (itemType === "question" && currentQ) {
+        currentIsAnon = currentQ.isAnonymous;
+      } else if (itemType === "answer") {
+        for (const q of questions) {
+          const ans = (q.answers || []).find(a => String(a.id) === String(itemId));
+          if (ans) {
+            currentIsAnon = ans.isAnonymous;
+            break;
+          }
+        }
+      }
+    }
+    
+    // Default to false if still null
+    if (currentIsAnon === null) currentIsAnon = false;
+    
+    const newIsAnon = !currentIsAnon;
+    console.log("toggleAnonymity:", { itemId, itemType, currentIsAnon, newIsAnon });
+    
+    // Optimistic update
     setQuestions((prev) => prev.map((q) => {
       if (itemType === "question" && String(q.id) === String(itemId)) {
-        const newIsAnon = !q.isAnonymous;
         return {
           ...q,
           isAnonymous: newIsAnon,
@@ -825,12 +890,11 @@ const restoreAnswerLocally = (questionId, answer) => {
           ...q,
           answers: (q.answers || []).map(ans => {
             if (String(ans.id) === String(itemId)) {
-              const newIsAnon = !ans.isAnonymous;
               return {
                 ...ans,
                 isAnonymous: newIsAnon,
                 author: newIsAnon ? "Anonymous User" : (ans.originalAuthorName || user?.name || "Community Member"),
-                avatar: newIsAnon ? "🕵️" : (ans.originalAuthorName || user?.name || "C").charAt(0).toUpperCase()
+                avatar: newIsAnon ? "🕵️" : (ans.originalAuthorName || user?.name || "C")[0].toUpperCase()
               };
             }
             return ans;
@@ -839,6 +903,23 @@ const restoreAnswerLocally = (questionId, answer) => {
       }
       return q;
     }));
+    
+    // Persist to backend
+    try {
+      if (itemType === "answer") {
+        const result = await updateAnswer(itemId, { isAnonymous: newIsAnon });
+        console.log("updateAnswer result:", result);
+      } else if (itemType === "question") {
+        const question = questions.find(q => String(q.id) === String(itemId));
+        if (question?.sourceType === "faq") {
+          await updateFaq(itemId, { isAnonymous: newIsAnon });
+        } else {
+          await updateQuery(itemId, { isAnonymous: newIsAnon });
+        }
+      }
+    } catch (err) {
+      console.error("Failed to persist anonymity change:", err);
+    }
   };
 
   const upvoteAnswer = async (questionId, answerId) => {
