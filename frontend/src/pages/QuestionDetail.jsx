@@ -1311,6 +1311,7 @@ const handleSubmitReply = async () => {
                       <button
                         onClick={() => handleAwardBounty(answer.id)}
                         className="bookmark-btn"
+                        style={{ marginLeft: "12px" }}
                       >
                         🏆 Award Bounty ({activeBounty.amount} pts)
                       </button>
