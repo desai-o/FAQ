@@ -125,8 +125,20 @@ export function AuthProvider({ children }) {
     setError(null);
   };
 
+  // Increment the current user's `answersCount` in local state so the
+  // Profile page reflects new submissions immediately, without requiring a
+  // full reload to re-fetch /auth/me. Backend remains the source of truth
+  // for the absolute value; this only keeps the UI snapshot in sync.
+  const incrementAnswersCount = () => {
+    setUser((prev) => {
+      if (!prev) return prev;
+      const current = Number(prev.answersCount) || 0;
+      return { ...prev, answersCount: current + 1 };
+    });
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, error, login, signup, logout }}>
+    <AuthContext.Provider value={{ user, loading, error, login, signup, logout, incrementAnswersCount }}>
       {children}
     </AuthContext.Provider>
   );

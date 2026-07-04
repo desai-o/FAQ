@@ -420,7 +420,7 @@ function mergeQuestionLists(...lists) {
 }
 
 export function FAQProvider({ children }) {
-  const { user } = useAuth();
+  const { user, incrementAnswersCount } = useAuth();
   const [questions, setQuestions] = useState(() => {
     const saved = localStorage.getItem(QUESTIONS_CACHE_KEY) || localStorage.getItem("crowdfaq_questions");
     const parsed = saved ? JSON.parse(saved) : initialQuestions;
@@ -815,6 +815,10 @@ const restoreAnswerLocally = (questionId, answer) => {
         )
       );
 
+      // Keep the AuthContext user snapshot in sync so the Profile page's
+      // "Answers Submitted" stat updates immediately, without a full reload.
+      incrementAnswersCount();
+
       return newAnswer;
     } catch (err) {
       console.warn("Answer backend write failed. Saving locally:", err.message);
@@ -843,6 +847,10 @@ const restoreAnswerLocally = (questionId, answer) => {
             : q
         )
       );
+
+      // Same sync for the offline fallback path — the user's answer still
+      // counts toward their profile submission total.
+      incrementAnswersCount();
 
       return fallbackAnswer;
     }
