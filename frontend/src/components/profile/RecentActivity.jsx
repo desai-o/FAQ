@@ -1,5 +1,7 @@
+import { useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { useFAQ } from "../../context/FAQContext";
+import { fetchUserRecentAnswers } from "../../api/faqApi";
 
 // ---------------------------------------------------------------------------
 // RecentActivity — Pass 1 wiring
@@ -22,6 +24,16 @@ import { useFAQ } from "../../context/FAQContext";
 // Identifier resolution (q.userId / q.user_id / q.authorId, both sides
 // stringified) matches ProfileStats, RecentContent, and TopFAQ so all four
 // sections agree on which items belong to the current user.
+//
+// Pass 2 wiring (this revision):
+//   On mount we additionally call GET /api/answers/user/:userId so the
+//   "Answered <title>" entries survive a hard refresh. FAQContext only
+//   carries questions; the Answer objects are loaded per-question when
+//   the user opens a question, so without this fetch the activity feed
+//   can only see answers that happen to be nested in the currently cached
+//   questions — which is why a freshly posted answer disappears after
+//   reload. The local-cache branch is kept so the new answer still shows
+//   up instantly while the fetch is in flight.
 // ---------------------------------------------------------------------------
 
 const COLORS = {
@@ -72,11 +84,57 @@ function RecentActivity() {
   const { questions } = useFAQ();
   const { user } = useAuth();
 
+  // Server-side recent answers for the current user. Fetched once on
+  // mount (and whenever the logged-in user changes). This is what makes
+  // the "Answered <title>" rows survive a hard refresh: the local FAQ
+  // cache never carries the full set of answers for the user, only the
+  // answers nested under questions that have been opened.
+  const [userAnswers, setUserAnswers] = useState([]);
+
+  useEffect(() => {
+    if (!user?.id) {
+      setUserAnswers([]);
+      return;
+    }
+    let cancelled = false;
+    fetchUserRecentAnswers(String(user.id), 20)
+      .then((res) => {
+        if (cancelled) return;
+        const items = Array.isArray(res?.data) ? res.data : [];
+        setUserAnswers(items);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        // Failure is non-fatal: the local-cache branch below still
+        // renders whatever is already in FAQContext.
+        setUserAnswers([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
+
   if (!user) return null;
 
   const userId = user.id ? String(user.id) : "";
 
   const events = [];
+  const answeredIds = new Set();
+
+  // Authoritative "Answered" entries from the server. These persist
+  // across page refreshes because they're backed by the Answer document
+  // in the database, not by transient client cache.
+  for (const a of userAnswers || []) {
+    const aid = a.id != null ? String(a.id) : null;
+    if (aid) answeredIds.add(aid);
+    events.push({
+      key: aid ? `answered-api-${aid}` : `answered-api-${Math.random()}`,
+      text: `Answered "${a.title || "Untitled"}"`,
+      time: formatTimestamp(a.createdAt),
+      iso: a.createdAt,
+      color: COLORS.answered
+    });
+  }
 
   for (const q of questions || []) {
     if (matchUser(q, userId)) {
@@ -95,13 +153,18 @@ function RecentActivity() {
       const aUserId = a.userId || a.user_id || a.authorId;
       if (!aUserId || String(aUserId) !== userId) continue;
 
+      const aid = a.id != null ? String(a.id) : (a._id != null ? String(a._id) : null);
+      // Skip duplicates already provided by the server response — the
+      // server entry has the canonical timestamp and parent title.
+      if (aid && answeredIds.has(aid)) continue;
+
       // Prefer the answer's own timestamp; fall back to the parent
       // question if the source didn't carry one (locally-added answers,
       // for example, only get `time: "Just now"`).
       const ts = a.createdAt || a.created_at || q.createdAt || q.updatedAt;
 
       events.push({
-        key: `answered-${q.id}-${a.id || a._id || Math.random()}`,
+        key: aid ? `answered-local-${aid}` : `answered-local-${q.id}-${Math.random()}`,
         text: `Answered "${q.title || q.question || "Untitled"}"`,
         time: formatTimestamp(ts),
         iso: ts,

@@ -799,6 +799,7 @@ const restoreAnswerLocally = (questionId, answer) => {
         avatar: isAnonymous ? "🕵️" : (savedAnswer.author || originalAuthorName).charAt(0).toUpperCase(),
         content: savedAnswer.content,
         votes: savedAnswer.votes || 0,
+        createdAt: savedAnswer.createdAt || new Date().toISOString(),
         time: "Just now",
         isBest: savedAnswer.isBest || false,
         voted: false
@@ -832,6 +833,7 @@ const restoreAnswerLocally = (questionId, answer) => {
         avatar: isAnonymous ? "🕵️" : author.charAt(0).toUpperCase(),
         content: cleanContent,
         votes: 0,
+        createdAt: new Date().toISOString(),
         time: "Just now",
         isBest: false,
         voted: false

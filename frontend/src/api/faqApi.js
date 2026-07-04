@@ -87,6 +87,12 @@ export async function fetchAnswers(questionId, limit = 20, offset = 0) {
   return request(`/answers/${questionId}?limit=${limit}&offset=${offset}`);
 }
 
+export async function fetchUserRecentAnswers(userId, limit = 20) {
+  return request(
+    `/answers/user/${encodeURIComponent(userId)}?limit=${limit}`
+  );
+}
+
 export async function toggleVote(payload) {
   return request("/votes", {
     method: "POST",
