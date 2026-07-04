@@ -101,8 +101,8 @@ export async function toggleBookmarkApi(payload) {
   });
 }
 
-export async function fetchBookmarks(userId = "anonymous") {
-  return request(`/bookmarks/${userId}`);
+export async function fetchBookmarks() {
+  return request("/bookmarks");
 }
 
 export async function fetchActivityStats(range = "week") {

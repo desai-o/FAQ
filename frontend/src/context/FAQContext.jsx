@@ -518,7 +518,7 @@ export function FAQProvider({ children }) {
     if (!user?.id || user.id === "anonymous") return;
     
     try {
-      const response = await fetchBookmarks(user.id);
+      const response = await fetchBookmarks();
       const bookmarksData = response?.data || [];
       
       // Extract question IDs from bookmarks

@@ -4,6 +4,7 @@ import {
 } from "./ProfileIcons";
 import { useAuth } from "../../context/AuthContext";
 import { useFAQ } from "../../context/FAQContext";
+import { useNavigate } from "react-router-dom";
 
 // ---------------------------------------------------------------------------
 // QuickLinks — Pass 1 wiring
@@ -42,6 +43,7 @@ function isPublished(question) {
 function QuickLinks() {
   const { questions } = useFAQ();
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   // Counts default to 0 so the layout stays stable when data is missing
   // (e.g. before FAQContext has loaded, or while the user is anonymous).
@@ -69,41 +71,46 @@ function QuickLinks() {
   }
 
   const quickLinks = [
-    {
-      label: "My FAQs",
-      count: myCount,
-      Icon: () => <MessagePlusIcon size={15} color="#64748b" />
-    },
-    {
-      label: "Draft FAQs",
-      count: draftCount,
-      Icon: () => <PencilIcon size={15} color="#64748b" />
-    },
-    {
-      label: "Published FAQs",
-      count: publishedCount,
-      Icon: () => <SendIcon size={15} color="#64748b" />
-    },
-    {
-      label: "Bookmarked FAQs",
-      count: bookmarkedCount,
-      Icon: () => <BookmarkIcon size={15} color="#64748b" />
-    },
-    {
-      label: "Recently Viewed",
-      count: "—",
-      Icon: () => <ClockIcon size={15} color="#64748b" />,
-      countTitle:
-        "Recently viewed history isn't tracked yet, so a count isn't available from the existing frontend data."
-    }
-  ];
+  {
+    label: "My FAQs",
+    count: myCount,
+    path: "/questions",
+    Icon: () => <MessagePlusIcon size={15} color="#64748b" />
+  },
+  {
+    label: "Draft FAQs",
+    count: draftCount,
+    path: "/questions",
+    Icon: () => <PencilIcon size={15} color="#64748b" />
+  },
+  {
+    label: "Published FAQs",
+    count: publishedCount,
+    path: "/questions",
+    Icon: () => <SendIcon size={15} color="#64748b" />
+  },
+  {
+    label: "Bookmarked FAQs",
+    count: bookmarkedCount,
+    path: "/bookmarks",
+    Icon: () => <BookmarkIcon size={15} color="#64748b" />
+  },
+  {
+    label: "Recently Viewed",
+    count: "—",
+    path: "/questions",
+    Icon: () => <ClockIcon size={15} color="#64748b" />,
+    countTitle:
+      "Recently viewed history isn't tracked yet, so a count isn't available from the existing frontend data."
+  }
+];
 
   return (
     <div className="quick-links-card profile-card">
       <h3 className="quick-links-heading">Quick Links</h3>
       <div className="quick-links">
         {quickLinks.map((link) => (
-          <button key={link.label} className="quick-link-row">
+          <button key={link.label} className="quick-link-row" onClick={() => navigate(link.path)}>
             <span className="quick-link-icon"><link.Icon /></span>
             <span className="quick-link-label">{link.label}</span>
             <span
