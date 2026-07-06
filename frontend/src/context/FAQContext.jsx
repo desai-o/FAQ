@@ -420,7 +420,7 @@ function mergeQuestionLists(...lists) {
 }
 
 export function FAQProvider({ children }) {
-  const { user, incrementAnswersCount } = useAuth();
+  const { user, incrementAnswersCount, incrementQuestionsCount } = useAuth();
   const [questions, setQuestions] = useState(() => {
     const saved = localStorage.getItem(QUESTIONS_CACHE_KEY) || localStorage.getItem("crowdfaq_questions");
     const parsed = saved ? JSON.parse(saved) : initialQuestions;
@@ -648,6 +648,14 @@ export function FAQProvider({ children }) {
 
       setBackendOnline(true);
 
+      // Keep the AuthContext user snapshot in sync so the Profile page's
+      // "FAQs Created" stat updates immediately after a successful post,
+      // without a full reload to re-fetch /auth/me. Mirrors the pattern
+      // addAnswer uses for `incrementAnswersCount`. Backend stays the
+      // source of truth for the absolute value; this just keeps the UI
+      // snapshot in sync between server refreshes.
+      incrementQuestionsCount();
+
       // Important: reload from both /faqs and /queries after server write.
       await loadQuestionsFromAllSources();
 
@@ -655,6 +663,12 @@ export function FAQProvider({ children }) {
     } catch (error) {
       console.warn("Question saved locally as unsynced because backend write failed:", error);
       setBackendOnline(false);
+
+      // Same sync for the offline fallback path — the user's local-only
+      // question still counts toward their profile submission total so
+      // the stat reflects what they actually authored.
+      incrementQuestionsCount();
+
       return tempQuestion;
     }
   };

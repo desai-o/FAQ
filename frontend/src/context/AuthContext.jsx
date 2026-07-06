@@ -137,8 +137,33 @@ export function AuthProvider({ children }) {
     });
   };
 
+  // Increment the current user's `questionsCount` in local state so the
+  // Profile page's "FAQs Created" stat updates immediately after posting
+  // a new question, without waiting for a full reload to re-fetch
+  // /auth/me. Mirrors `incrementAnswersCount` exactly — backend stays the
+  // source of truth for the absolute value, this just keeps the UI
+  // snapshot in sync between server refreshes.
+  const incrementQuestionsCount = () => {
+    setUser((prev) => {
+      if (!prev) return prev;
+      const current = Number(prev.questionsCount) || 0;
+      return { ...prev, questionsCount: current + 1 };
+    });
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, error, login, signup, logout, incrementAnswersCount }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        error,
+        login,
+        signup,
+        logout,
+        incrementAnswersCount,
+        incrementQuestionsCount
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

@@ -24,6 +24,7 @@ async function resolveUserById(decodedId) {
         questionsCount: user.questionsCount || 0,
         answersCount: user.answersCount || 0,
         reputation: user.reputation || 0,
+        badges: user.badges || [],
         storage: "mongodb"
       };
     }
@@ -53,6 +54,7 @@ async function resolveUserById(decodedId) {
     questionsCount: sqliteUser.questions_count || 0,
     answersCount: sqliteUser.answers_count || 0,
     reputation: sqliteUser.reputation || 0,
+    badges: sqliteUser.badges ? sqliteUser.badges.split(",").filter(Boolean) : [],
     storage: "sqlite"
   };
 }

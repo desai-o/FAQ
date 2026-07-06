@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import {
   fetchNotifications,
@@ -91,27 +92,27 @@ function RecentActivity() {
   const [marking, setMarking] = useState(false);
 
   useEffect(() => {
-    if (!user) {
-      setNotifications([]);
-      setLoading(false);
-      return;
-    }
+    // No user → no fetch. The render path early-returns on !user below,
+    // so we don't need a synchronous state reset here.
+    //
+    // `loading` starts at `true` (the initial useState value) and is
+    // flipped to `false` inside the .then / .catch callbacks — never
+    // synchronously in the effect body — to satisfy the
+    // react-hooks/set-state-in-effect rule.
+    if (!user) return;
+
     let cancelled = false;
-    setLoading(true);
-    setError(null);
     fetchNotifications()
       .then((res) => {
         if (cancelled) return;
-        const items = Array.isArray(res?.data) ? res.data : [];
-        setNotifications(items);
+        setNotifications(Array.isArray(res?.data) ? res.data : []);
+        setError(null);
+        setLoading(false);
       })
       .catch((err) => {
         if (cancelled) return;
         setError(err?.message || "Couldn't load activity. Please try again.");
         setNotifications([]);
-      })
-      .finally(() => {
-        if (cancelled) return;
         setLoading(false);
       });
     return () => {
@@ -179,7 +180,7 @@ function RecentActivity() {
               {marking ? "Marking…" : `Mark all read (${unreadCount})`}
             </button>
           )}
-          <button className="view-all-btn">View all</button>
+        <Link to="/notifications" className="view-all-btn">View all</Link>
         </div>
       </div>
 

@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { TrophyIcon } from "./ProfileIcons";
 import { useAuth } from "../../context/AuthContext";
 import { useFAQ } from "../../context/FAQContext";
@@ -88,7 +89,7 @@ function TopFAQ() {
         <h3>
           Top FAQ <span className="card-subhead">(by views)</span>
         </h3>
-        <button className="view-all-btn">View all</button>
+        <Link to="/questions" className="view-all-btn">View all</Link>
       </div>
       <div className="top-faq-item">
         <div className="top-faq-icon-wrap">

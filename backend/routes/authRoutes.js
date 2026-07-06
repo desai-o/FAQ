@@ -90,6 +90,7 @@ router.post("/signup", authLimiter, async (req, res) => {
         questionsCount: 0,
         answersCount: 0,
         reputation: 0,
+        badges: newUser.badges || [],
         storage: "mongodb"
       };
 
@@ -124,6 +125,7 @@ router.post("/signup", authLimiter, async (req, res) => {
         questionsCount: 0,
         answersCount: 0,
         reputation: 0,
+        badges: [],
         storage: "sqlite"
       };
     }
@@ -180,6 +182,7 @@ router.post("/login", authLimiter, async (req, res) => {
             questionsCount: user.questionsCount,
             answersCount: user.answersCount,
             reputation: user.reputation,
+            badges: user.badges || [],
             storage: "mongodb"
           };
           return success(res, {
@@ -210,6 +213,7 @@ router.post("/login", authLimiter, async (req, res) => {
           questionsCount: sqliteUser.questions_count,
           answersCount: sqliteUser.answers_count,
           reputation: sqliteUser.reputation,
+          badges: sqliteUser.badges ? sqliteUser.badges.split(",").filter(Boolean) : [],
           storage: "sqlite"
         };
         return success(res, {

@@ -1,9 +1,5 @@
-import { FileIcon, EyeIcon, ThumbsUpIcon } from "./ProfileIcons";
-import { useAuth } from "../../context/AuthContext";
-import { useFAQ } from "../../context/FAQContext";
-
 // ---------------------------------------------------------------------------
-// RecentContent — Pass 1 wiring
+// RecentContent — Pass 1 wiring (View All → internal scroll)
 // ---------------------------------------------------------------------------
 // Replaces the hardcoded sample list with the logged-in user's actual
 // questions from FAQContext.questions, filtered by the canonical user.id
@@ -16,9 +12,13 @@ import { useFAQ } from "../../context/FAQContext";
 // source that bypassed the merger (cache-only, etc.).
 //
 // Empty state: when the user has no items in the cache the table is replaced
-// with a clean inline-styled message. The card chrome (title + View all
-// button) is preserved exactly.
+// with a clean inline-styled message. The card chrome (title only — the
+// "View all" button has been removed in favor of an internal scrollable
+// list) is preserved exactly.
 // ---------------------------------------------------------------------------
+import { FileIcon, EyeIcon, ThumbsUpIcon } from "./ProfileIcons";
+import { useAuth } from "../../context/AuthContext";
+import { useFAQ } from "../../context/FAQContext";
 
 // Compact number formatter for the views column (1240 -> "1.2K"). Matches
 // the format used by the original hardcoded sample data so the column
@@ -73,7 +73,6 @@ function RecentContent() {
     <div className="recent-content-card profile-card">
       <div className="card-header-row">
         <h3>Recent Content</h3>
-        <button className="view-all-btn">View all</button>
       </div>
 
       {myContent.length === 0 ? (
@@ -95,53 +94,68 @@ function RecentContent() {
           </p>
         </div>
       ) : (
-        <table className="content-table">
-          <tbody>
-            {myContent.map((item) => {
-              const displayTitle = item.title || item.question || "Untitled";
-              const status = deriveStatus(item);
-              const views = formatViews(item.views);
-              const votes = Number(item.votes);
-              const hasVotes = Number.isFinite(votes);
+        // Internal scroll container — replaces the previous "View all" link.
+        // Fixed max height lets users browse all their recent questions
+        // inside the card. `overflowY: "auto"` only shows the scrollbar
+        // when content exceeds the cap, so cards with few items render
+        // identically to before. `scrollbarWidth: "thin"` keeps the rail
+        // unobtrusive across browsers.
+        <div
+          className="recent-content-scroll"
+          style={{
+            maxHeight: "320px",
+            overflowY: "auto",
+            scrollbarWidth: "thin"
+          }}
+        >
+          <table className="content-table">
+            <tbody>
+              {myContent.map((item) => {
+                const displayTitle = item.title || item.question || "Untitled";
+                const status = deriveStatus(item);
+                const views = formatViews(item.views);
+                const votes = Number(item.votes);
+                const hasVotes = Number.isFinite(votes);
 
-              return (
-                <tr key={item.id} className="content-table-row">
-                  <td className="content-table-icon">
-                    <FileIcon size={14} color="#cbd5e1" />
-                  </td>
-                  <td className="content-table-title">
-                    {displayTitle}
-                    <span
-                      className={`content-status ${
-                        status === "Published" ? "status-published" : "status-draft"
-                      }`}
-                    >
-                      {status}
-                    </span>
-                  </td>
-                  <td className="content-table-stat">
-                    {views !== null ? (
-                      <span className="stat-with-icon">
-                        <EyeIcon size={12} color="#94a3b8" /> {views}
+                return (
+                  <tr key={item.id} className="content-table-row">
+                    <td className="content-table-icon">
+                      <FileIcon size={14} color="#cbd5e1" />
+                    </td>
+                    <td className="content-table-title">
+                      {displayTitle}
+                      <span
+                        className={`content-status ${
+                          status === "Published" ? "status-published" : "status-draft"
+                        }`}
+                      >
+                        {status}
                       </span>
-                    ) : (
-                      <span className="stat-empty">—</span>
-                    )}
-                  </td>
-                  <td className="content-table-stat">
-                    {hasVotes ? (
-                      <span className="stat-with-icon">
-                        <ThumbsUpIcon size={12} color="#94a3b8" /> {votes}
-                      </span>
-                    ) : (
-                      <span className="stat-empty">—</span>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                    </td>
+                    <td className="content-table-stat">
+                      {views !== null ? (
+                        <span className="stat-with-icon">
+                          <EyeIcon size={12} color="#94a3b8" /> {views}
+                        </span>
+                      ) : (
+                        <span className="stat-empty">—</span>
+                      )}
+                    </td>
+                    <td className="content-table-stat">
+                      {hasVotes ? (
+                        <span className="stat-with-icon">
+                          <ThumbsUpIcon size={12} color="#94a3b8" /> {votes}
+                        </span>
+                      ) : (
+                        <span className="stat-empty">—</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );
