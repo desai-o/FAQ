@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import {
   fetchNotifications,
@@ -47,6 +46,11 @@ function colorForEvent(eventType) {
   return EVENT_COLORS[eventType] || DEFAULT_EVENT_COLOR;
 }
 
+// How many events to surface directly in the card. Anything beyond this
+// is reachable through the "View all" modal. Mirrors the Badges card so
+// the two side-by-side previews share the same visual rhythm.
+const PREVIEW_LIMIT = 5;
+
 // Relative-time formatter. Mirrors the rhythm of the original hardcoded
 // list ("2 days ago", "1 week ago") and switches to an absolute date
 // format ("Feb 15, 2025") once an item is older than a month, so the
@@ -90,6 +94,7 @@ function RecentActivity() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [marking, setMarking] = useState(false);
+  const [viewAllOpen, setViewAllOpen] = useState(false);
 
   useEffect(() => {
     // No user → no fetch. The render path early-returns on !user below,
@@ -119,6 +124,23 @@ function RecentActivity() {
       cancelled = true;
     };
   }, [user]);
+
+  // Escape-to-close + body-scroll lock for the "View all" modal. Mirrors
+  // ProfileBadges so the two cards on the Profile page behave identically.
+  // Only attached while the modal is open so the rest of the page keeps
+  // its normal scroll and keyboard behaviour.
+  useEffect(() => {
+    if (!viewAllOpen) return undefined;
+    const handleKey = (e) => {
+      if (e.key === "Escape") setViewAllOpen(false);
+    };
+    document.addEventListener("keydown", handleKey);
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", handleKey);
+      document.body.style.overflow = "";
+    };
+  }, [viewAllOpen]);
 
   if (!user) return null;
 
@@ -155,6 +177,11 @@ function RecentActivity() {
     }
   };
 
+  // Card preview is capped so the rest has a clear home in the modal.
+  // Derived here (not memoized) — `events` is rebuilt every render anyway
+  // and the slice is O(PREVIEW_LIMIT).
+  const previewEvents = events.slice(0, PREVIEW_LIMIT);
+
   return (
     <div className="activity-card profile-card">
       <div className="card-header-row">
@@ -180,7 +207,19 @@ function RecentActivity() {
               {marking ? "Marking…" : `Mark all read (${unreadCount})`}
             </button>
           )}
-        <Link to="/notifications" className="view-all-btn">View all</Link>
+          {/* The "View all" affordance opens an in-page modal that renders
+              the full Recent Activity list. We deliberately do NOT navigate
+              to /notifications or reuse the NotificationCenter component —
+              the modal is the same data the card shows, just un-truncated. */}
+          {!loading && !error && events.length > 0 && (
+            <button
+              type="button"
+              className="view-all-btn"
+              onClick={() => setViewAllOpen(true)}
+            >
+              View all{events.length > PREVIEW_LIMIT ? ` (${events.length})` : ""}
+            </button>
+          )}
         </div>
       </div>
 
@@ -229,7 +268,7 @@ function RecentActivity() {
         </div>
       ) : (
         <ul className="activity-list">
-          {events.map((e) => (
+          {previewEvents.map((e) => (
             <li key={e.key} className="activity-item">
               <span
                 className="activity-dot"
@@ -245,6 +284,88 @@ function RecentActivity() {
             </li>
           ))}
         </ul>
+      )}
+
+      {viewAllOpen && (
+        <div
+          className="modal-overlay active"
+          onClick={() => setViewAllOpen(false)}
+          role="presentation"
+        >
+          {/* Stop click propagation so clicks inside the modal don't
+              bubble up to the overlay (which would close it). Mirrors
+              the structure used by the Badges modal. */}
+          <div
+            className="modal"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="all-activity-modal-title"
+          >
+            <div className="modal-header">
+              <h2 id="all-activity-modal-title">All Recent Activity</h2>
+              <button
+                type="button"
+                className="modal-close"
+                onClick={() => setViewAllOpen(false)}
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="modal-body">
+              {events.length === 0 ? (
+                <p
+                  style={{
+                    textAlign: "center",
+                    color: "var(--text-secondary, #64748b)",
+                    padding: "16px 0",
+                    fontSize: "14px"
+                  }}
+                >
+                  You have no activity yet.
+                </p>
+              ) : (
+                <ul
+                  className="activity-list activity-modal-list"
+                  style={{
+                    maxHeight: "60vh",
+                    overflowY: "auto",
+                    padding: "8px 4px",
+                    scrollbarWidth: "thin"
+                  }}
+                >
+                  {events.map((e) => (
+                    <li key={e.key} className="activity-item">
+                      <span
+                        className="activity-dot"
+                        style={{
+                          background: e.color,
+                          opacity: e.isRead ? 0.5 : 1
+                        }}
+                      />
+                      <div className="activity-text">
+                        <p>{e.text}</p>
+                        <span className="activity-time">{e.time}</span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <div className="modal-footer">
+              <button
+                type="button"
+                className="modal-cancel"
+                onClick={() => setViewAllOpen(false)}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
