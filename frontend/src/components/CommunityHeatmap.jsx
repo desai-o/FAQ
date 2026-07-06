@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { fetchHeatmapStats } from "../api/faqApi";
+import { calculateRangeTotal, calculateTrendPercent } from "./communityHeatmapUtils";
 import "./CommunityHeatmap.css";
 
 const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -78,7 +79,7 @@ const generateStaticData = (range) => {
             trendVal = -0.8;
           }
         }
-        
+
         // Add minor custom variations for realism
         if (day === "Wed" && time === "4 PM") { intensity = 4; questions = 48; answers = 128; trendVal = 14.6; }
         if (day === "Thu" && time === "12 PM") { intensity = 4; questions = 41; answers = 98; trendVal = 11.2; }
@@ -200,11 +201,56 @@ const datasets = {
   "Two Weeks Ago": generateStaticData("Two Weeks Ago"),
 };
 
-// Trend configuration for each range
-const trendValues = {
-  "This Week": { value: "+4.2%", positive: true },
-  "Last Week": { value: "+8.5%", positive: true },
-  "Two Weeks Ago": { value: "-1.8%", positive: false },
+// Order of ranges from oldest -> newest, so the previous range for any
+// given range is the chronologically earlier one. This is what we compare
+// against to compute the "vs Last Week" trend.
+//   - This Week       -> baseline = Last Week
+//   - Last Week       -> baseline = Two Weeks Ago
+//   - Two Weeks Ago   -> baseline = none (shows em-dash)
+const rangeOrder = ["Two Weeks Ago", "Last Week", "This Week"];
+
+// Map the user-facing dropdown label to the API range param understood by
+// the /api/stats/heatmap endpoint. All three options now resolve to a 7-day
+// window so "Last Week" / "Two Weeks Ago" don't accidentally pull 30 days.
+//   - "This Week"     -> "week"          (last 7 days, rolling)
+//   - "Last Week"     -> "last_week"     (7-13 days ago)
+//   - "Two Weeks Ago" -> "two_weeks_ago" (14-20 days ago)
+const rangeToApiParam = (rangeKey) => {
+  if (rangeKey === "Last Week") return "last_week";
+  if (rangeKey === "Two Weeks Ago") return "two_weeks_ago";
+  return "week";
+};
+
+// Convert an array of heatmap cells (the shape the backend returns) into a
+// map keyed by `${time}-${day}`, matching the shape `datasets[key]` uses.
+const cellsToMap = (cells) => {
+  const map = {};
+  for (const cell of cells) {
+    if (!cell || !cell.time || !cell.day) continue;
+    map[`${cell.time}-${cell.day}`] = cell;
+  }
+  return map;
+};
+
+// Sum of (questions + answers) for a heatmap dataset - works on both the
+// raw `data` array returned by the API and the static dataset maps.
+const sumInteractions = (rows) => {
+  if (!rows) return 0;
+  if (Array.isArray(rows)) return calculateRangeTotal(rows);
+  return calculateRangeTotal(Object.values(rows));
+};
+
+// Compute the total interactions (questions + answers) for a given range's dataset
+const computeRangeTotal = (rangeKey) => {
+  const data = datasets[rangeKey];
+  if (!data) return 0;
+  return sumInteractions(data);
+};
+
+// Compute the percentage change between two numeric totals.
+// Returns an object with the formatted string and a `positive` flag.
+const computeTrendPercent = (current, previous) => {
+  return calculateTrendPercent(current, previous);
 };
 
 // Icons
@@ -224,15 +270,15 @@ const ChevronDownIcon = () => (
 );
 
 const TrendUpIcon = ({ isNegative }) => (
-  <svg 
-    width="10" 
-    height="10" 
-    viewBox="0 0 24 24" 
-    fill="none" 
-    stroke="currentColor" 
-    strokeWidth="2.5" 
-    strokeLinecap="round" 
-    strokeLinejoin="round" 
+  <svg
+    width="10"
+    height="10"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
     style={{ marginRight: "2px", transform: isNegative ? "rotate(90deg)" : "none" }}
   >
     {isNegative ? (
@@ -254,53 +300,182 @@ function CommunityHeatmap() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [hoveredData, setHoveredData] = useState(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
-  
+
   const cardRef = useRef(null);
   const dropdownRef = useRef(null);
 
   const [heatmapData, setHeatmapData] = useState([]);
+  // `meta.totalEvents` from the API. When this is 0 the backend served its
+  // range-agnostic `populateFallbackHeatmap` data, which produces the SAME
+  // pattern for "This Week" / "Last Week" / "Two Weeks Ago" - that is why
+  // every tab used to show the same total and the same pebble pattern. We
+  // use this flag to detect that case and prefer the per-range static
+  // demo dataset instead.
+  const [heatmapMeta, setHeatmapMeta] = useState({});
+  // Live API data for the chronologically previous range, used so the
+  // "vs Last Week" badge compares API vs API instead of mixing live data
+  // with the static fallback dataset.
+  const [previousHeatmapData, setPreviousHeatmapData] = useState([]);
+  const [previousHeatmapMeta, setPreviousHeatmapMeta] = useState({});
   const [loadingHeatmap, setLoadingHeatmap] = useState(true);
 
+  // Compute totals for each static range up-front, so we can compute trends
+  // between adjacent ranges when the API is unavailable (e.g. offline demo).
+  const staticRangeTotals = rangeOrder.reduce((acc, key) => {
+    acc[key] = computeRangeTotal(key);
+    return acc;
+  }, {});
+
   useEffect(() => {
+    let cancelled = false;
+
+    // Clear stale data from the previously selected range so we never
+    // briefly display the previous tab's totals above the new tab's cells
+    // while the API request for the new range is still in flight.
+    setHeatmapData([]);
+    setHeatmapMeta({});
+    setPreviousHeatmapData([]);
+    setPreviousHeatmapMeta({});
+
     const loadHeatmap = async () => {
       try {
         setLoadingHeatmap(true);
-        const response = await fetchHeatmapStats(
-          selectedRange === "This Week" ? "week" : "month"
-        );
-        setHeatmapData(response.data || []);
+        const currentIdx = rangeOrder.indexOf(selectedRange);
+        const previousKey = currentIdx > 0 ? rangeOrder[currentIdx - 1] : null;
+
+        const currentPromise = fetchHeatmapStats(rangeToApiParam(selectedRange));
+        // "Two Weeks Ago" has no chronologically earlier range, but we still
+        // load "Last Week" so we can fall back to it (the "oldest available"
+        // data) when "Two Weeks Ago" comes back empty from the API.
+        const comparisonKey = previousKey || "Last Week";
+        const previousPromise = fetchHeatmapStats(rangeToApiParam(comparisonKey));
+
+        const [currentResponse, previousResponse] = await Promise.all([
+          currentPromise,
+          previousPromise
+        ]);
+
+        if (cancelled) return;
+
+        setHeatmapData(currentResponse?.data || []);
+        setHeatmapMeta(currentResponse?.meta || {});
+        setPreviousHeatmapData(previousResponse?.data || []);
+        setPreviousHeatmapMeta(previousResponse?.meta || {});
       } catch (err) {
+        if (cancelled) return;
         console.warn("Heatmap API failed. Falling back to static heatmap:", err.message);
         setHeatmapData([]);
+        setHeatmapMeta({});
+        setPreviousHeatmapData([]);
+        setPreviousHeatmapMeta({});
       } finally {
-        setLoadingHeatmap(false);
+        if (!cancelled) setLoadingHeatmap(false);
       }
     };
 
     loadHeatmap();
+    return () => { cancelled = true; };
   }, [selectedRange]);
 
-  // Get active dataset and trend
-  const currentDataMap =
-    heatmapData.length > 0
-      ? heatmapData.reduce((acc, item) => {
-          acc[`${item.time}-${item.day}`] = {
-            ...item,
-            timeRange: timeRanges[item.time] || item.time,
-            intensity: Math.min(4, Math.ceil((item.interactions || 0) / 5)),
-            trendVal: item.interactions || 0,
-            trend: "+0.0%"
-          };
-          return acc;
-        }, {})
-      : datasets[selectedRange];
+  // Cell-level previous range lookup helper (used for tooltip trend).
+  // Prefer the previous range's live API cells when available, fall back to
+  // the static dataset for that range otherwise.
+  const previousCellMap =
+    previousHeatmapData.length > 0 ? cellsToMap(previousHeatmapData) : null;
 
-  const currentTrend = trendValues[selectedRange];
+  const getPreviousCell = (rangeKey, time, day) => {
+    const idx = rangeOrder.indexOf(rangeKey);
+    if (idx <= 0) return null;
+    const prevKey = rangeOrder[idx - 1];
 
-  // Calculate total interaction sum dynamically
-  const totalInteractions = Object.values(currentDataMap).reduce((acc, curr) => {
-    return acc + curr.questions + curr.answers;
-  }, 0);
+    if (previousCellMap) {
+      return previousCellMap[`${time}-${day}`] || null;
+    }
+    const prevMap = datasets[prevKey];
+    return prevMap ? prevMap[`${time}-${day}`] || null : null;
+  };
+
+  // Decide whether to use the live API data or the per-range static demo
+  // dataset. The backend's `populateFallbackHeatmap` returns the SAME
+  // range-agnostic pattern for every range when `meta.totalEvents === 0`,
+  // which previously caused every tab to look identical. Prefer the
+  // per-range static data in that case so each tab shows distinct content.
+  const apiHasRealData =
+    heatmapData.length > 0 && (heatmapMeta?.totalEvents || 0) > 0;
+
+  // Get active dataset and total
+  // When API data is "real" (meta.totalEvents > 0), use the API's
+  // `interactions` count (which includes votes and any other event types)
+  // as each cell's `cellTotal`. When API data is the range-agnostic
+  // fallback, prefer the per-range static demo dataset so each tab has
+  // its own distinct pattern and total.
+  const currentDataMap = apiHasRealData
+    ? heatmapData.reduce((acc, item) => {
+        const time = item.time;
+        const day = item.day;
+        const questions = item.questions ?? 0;
+        const answers = item.answers ?? 0;
+        const cellTotal = Number(item.interactions ?? (questions + answers)) || 0;
+
+        acc[`${time}-${day}`] = {
+          ...item,
+          questions,
+          answers,
+          timeRange: timeRanges[time] || time,
+          intensity: Math.min(4, Math.ceil(cellTotal / 5)),
+          cellTotal,
+        };
+        return acc;
+      }, {})
+    : Object.fromEntries(
+        Object.entries(datasets[selectedRange]).map(([key, cell]) => {
+          // Static demo dataset has questions/answers but no `interactions`
+          // field, so derive a cell total from questions + answers here.
+          const cellTotal = (cell.questions || 0) + (cell.answers || 0);
+          return [
+            key,
+            {
+              ...cell,
+              cellTotal,
+            },
+          ];
+        })
+      );
+
+  // Calculate "Total Interactions" with a proper fallback chain so the
+  // number is always meaningful when the user switches tabs:
+  //   1. Live API data for the selected range (only if it is "real" - i.e.
+  //      meta.totalEvents > 0). The backend's `populateFallbackHeatmap`
+  //      otherwise returns the same range-agnostic pattern for every tab,
+  //      so we would otherwise show the same count for every range.
+  //   2. For "Two Weeks Ago" without API data, fall back to the "oldest
+  //      available" data: "Last Week" from the API when it has real data.
+  //      This keeps the count from collapsing to 0 during the window where
+  //      the backend hasn't recorded events for two-weeks-ago yet.
+  //   3. The per-range static demo dataset, which has a distinct total and
+  //      pattern for every range, so each tab shows a different number.
+  //   4. The static demo dataset for the most recent available range, so we
+  //      never end up showing 0.
+  const totalInteractions = (() => {
+    if (apiHasRealData) {
+      return sumInteractions(heatmapData);
+    }
+
+    if (
+      selectedRange === "Two Weeks Ago" &&
+      previousHeatmapData.length > 0 &&
+      (previousHeatmapMeta?.totalEvents || 0) > 0
+    ) {
+      return sumInteractions(previousHeatmapData);
+    }
+
+    const staticSelected = staticRangeTotals[selectedRange] || 0;
+    if (staticSelected > 0) return staticSelected;
+
+    // Last-resort: use the newest available static range ("This Week") so
+    // the count is never 0/placeholder.
+    return staticRangeTotals["This Week"] || 0;
+  })();
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -330,7 +505,7 @@ function CommunityHeatmap() {
 
   const updateTooltipPosition = (e) => {
     if (!cardRef.current) return;
-    
+
     // Get mouse coordinates relative to the card container
     const cardRect = cardRef.current.getBoundingClientRect();
     const x = e.clientX - cardRect.left;
@@ -369,7 +544,7 @@ function CommunityHeatmap() {
             <span>{selectedRange}</span>
             <ChevronDownIcon />
           </button>
-          
+
           {dropdownOpen && (
             <ul className="heatmap-dropdown-list">
               {Object.keys(datasets).map((range) => (
@@ -395,11 +570,6 @@ function CommunityHeatmap() {
           {totalInteractions.toLocaleString()}
         </span>
         <span className="heatmap-stat-label">Total Interactions</span>
-        
-        <span className={`heatmap-trend-badge ${!currentTrend.positive ? "negative" : ""}`}>
-          <TrendUpIcon isNegative={!currentTrend.positive} />
-          <span>{currentTrend.value}</span>
-        </span>
       </div>
 
       {/* Heatmap Grid wrapper (for horizontal scroll support on small screens) */}
@@ -422,10 +592,10 @@ function CommunityHeatmap() {
               })}
             </React.Fragment>
           ))}
-          
+
           {/* Spacer for empty corner block */}
           <div className="heatmap-spacer" />
-          
+
           {/* Column headers (Days) at the bottom */}
           {days.map((day) => (
             <div key={day} className="heatmap-day-label">
@@ -445,7 +615,7 @@ function CommunityHeatmap() {
           }}
         >
           <span className="heatmap-tooltip-time">{hoveredData.timeRange}</span>
-          
+
           <div className="heatmap-tooltip-stat-row">
             <span className="heatmap-tooltip-label">Questions</span>
             <span className="heatmap-tooltip-value">{hoveredData.questions}</span>
@@ -454,13 +624,6 @@ function CommunityHeatmap() {
           <div className="heatmap-tooltip-stat-row">
             <span className="heatmap-tooltip-label">Answers</span>
             <span className="heatmap-tooltip-value">{hoveredData.answers}</span>
-          </div>
-
-          <div className="heatmap-tooltip-footer">
-            <span className="heatmap-tooltip-footer-label">vs Last Week</span>
-            <span className={`heatmap-tooltip-percentage ${hoveredData.trend.startsWith("-") ? "negative" : ""}`}>
-              {hoveredData.trend}
-            </span>
           </div>
         </div>
       )}

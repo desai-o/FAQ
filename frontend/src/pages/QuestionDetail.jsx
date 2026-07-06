@@ -8,7 +8,7 @@ import Hashtag from "../components/Hashtag";
 import { useFAQ } from "../context/FAQContext";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
-import { deleteFaq, deleteQuery, updateAnswer, deleteAnswer, updateQuery, followResource, unfollowResource, muteFollow, fetchAnswers, fetchFaqTranslations, createFaqTranslation, createBounty, awardBounty, fetchBounties } from "../api/faqApi";
+import { deleteFaq, deleteQuery, updateAnswer, deleteAnswer, updateQuery, followResource, unfollowResource, muteFollow, fetchAnswers, createBounty, awardBounty, fetchBounties } from "../api/faqApi";
 import ErrorToast from "../components/ErrorToast";
 
 const defaultQuestion = {
@@ -33,9 +33,6 @@ function QuestionDetail() {
   const [summary, setSummary] = useState("");
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState("");
-  const [translations, setTranslations] = useState([]);
-  const [selectedLanguage, setSelectedLanguage] = useState("original");
-  const [translating, setTranslating] = useState(false);
   const [activeBounty, setActiveBounty] = useState(null);
   const [bountyAmount, setBountyAmount] = useState(50);
   const [showBountyForm, setShowBountyForm] = useState(false);
@@ -43,6 +40,7 @@ function QuestionDetail() {
   const [pendingQuestionDelete, setPendingQuestionDelete] = useState(null);
   const [pendingAnswerDelete, setPendingAnswerDelete] = useState(null);
   const [hasGoneBack, setHasGoneBack] = useState(false);
+  const [openAnswerDropdownId, setOpenAnswerDropdownId] = useState(null);
 
   const [isAnonymousReply, setIsAnonymousReply] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
@@ -96,6 +94,7 @@ function QuestionDetail() {
           return {
             id: ans._id || ans.id,
             userId: ans.userId || ans.user_id,
+            authorId: ans.userId || ans.user_id,
             isAnonymous: rawIsAnon,
             author: rawIsAnon ? "Anonymous User" : (ans.author || ans.authorName || "Community Member"),
             originalAuthorName: ans.authorName || ans.author || "Community Member",
@@ -117,17 +116,6 @@ function QuestionDetail() {
       }
     } catch (err) {
       console.error("Failed to load answers from backend", err);
-    }
-  };
-
-  const loadTranslations = async () => {
-    try {
-      const res = await fetchFaqTranslations(id);
-      if (res && res.data) {
-        setTranslations(res.data);
-      }
-    } catch (err) {
-      console.error("Failed to load translations:", err);
     }
   };
 
@@ -179,26 +167,11 @@ function QuestionDetail() {
     }
   };
 
-  const handleTranslateClick = async (lang) => {
-    setTranslating(true);
-    try {
-      await createFaqTranslation(id, { language: lang });
-      await loadTranslations();
-      setSelectedLanguage(lang);
-    } catch (err) {
-      console.error("Translation error:", err);
-      setError(err.message || "Failed to translate FAQ.");
-    } finally {
-      setTranslating(false);
-    }
-  };
-
 useEffect(() => {
     if (loadingQuestions) return;
 
     if (id && id !== "test-id" && id !== "undefined") {
       loadAnswers(0);
-      loadTranslations();
       loadBounties();
     } else if (question && question.answers) {
       setAnswers(question.answers);
@@ -279,6 +252,10 @@ useEffect(() => {
     const handleClickOutside = (event) => {
       if (followMenuRef.current && !followMenuRef.current.contains(event.target)) {
         setShowFollowMenu(false);
+      }
+      // Close answer dropdowns when clicking outside
+      if (!event.target.closest('.answer-dropdown-menu') && !event.target.closest('.answer-dropdown-trigger')) {
+        setOpenAnswerDropdownId(null);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -495,49 +472,6 @@ const handleSubmitReply = async () => {
                   </div>
 
                   <div className="detail-body">
-                    <div className="translation-controls" style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px", fontSize: "13px" }}>
-                      <span style={{ color: "var(--text-secondary)" }}>Language:</span>
-                      <select
-                        value={selectedLanguage}
-                        onChange={(e) => setSelectedLanguage(e.target.value)}
-                        style={{
-                          padding: "4px 8px",
-                          borderRadius: "6px",
-                          backgroundColor: "var(--surface-secondary, #2d2d2d)",
-                          color: "var(--text-primary)",
-                          border: "1px solid var(--border)",
-                          outline: "none"
-                        }}
-                      >
-                        <option value="original">Original (English)</option>
-                        <option value="spanish">Spanish</option>
-                        <option value="french">French</option>
-                        <option value="german">German</option>
-                        <option value="chinese">Chinese</option>
-                        <option value="japanese">Japanese</option>
-                        <option value="hindi">Hindi</option>
-                      </select>
-
-                      {selectedLanguage !== "original" && !translations.some(t => t.language.toLowerCase() === selectedLanguage.toLowerCase()) && (
-                        <button
-                          onClick={() => handleTranslateClick(selectedLanguage)}
-                          disabled={translating}
-                          style={{
-                            padding: "4px 10px",
-                            fontSize: "12px",
-                            borderRadius: "6px",
-                            backgroundColor: "#0d9488",
-                            color: "#fff",
-                            border: "none",
-                            cursor: "pointer",
-                            fontWeight: "600"
-                          }}
-                        >
-                          {translating ? "Translating..." : "✨ AI Translate"}
-                        </button>
-                      )}
-                    </div>
-
                     {activeBounty ? (
                       <div style={{
                         margin: "12px 0 16px",
@@ -628,7 +562,7 @@ const handleSubmitReply = async () => {
                           )}
                         </div>
                       )
-                    )}                
+                    )}
 
                 {isEditingQuestion ? (
                   <>
@@ -684,16 +618,7 @@ const handleSubmitReply = async () => {
                   </>
                   ) : (
                     <h1 className="detail-title">
-                      {selectedLanguage !== "original" &&
-                      translations.find(
-                        (t) =>
-                          t.language.toLowerCase() === selectedLanguage.toLowerCase()
-                      )
-                        ? translations.find(
-                          (t) =>
-                            t.language.toLowerCase() === selectedLanguage.toLowerCase()
-                        ).question
-                        : question.title}
+                      {question.title}
                     </h1>
                   )}
 
@@ -730,25 +655,7 @@ const handleSubmitReply = async () => {
 
 
 
-                    {selectedLanguage !== "original" && translations.find(t => t.language.toLowerCase() === selectedLanguage.toLowerCase()) ? (
-                      <div style={{
-                        margin: "16px 0",
-                        padding: "16px",
-                        borderRadius: "12px",
-                        backgroundColor: "rgba(13, 148, 136, 0.08)",
-                        border: "1px solid rgba(13, 148, 136, 0.2)",
-                        boxShadow: "inset 0 1px 2px rgba(0,0,0,0.05)"
-                      }}>
-                        <div style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase", color: "#0d9488", marginBottom: "8px", display: "flex", alignItems: "center", gap: "6px" }}>
-                          <span className="chat-pulse-dot" style={{ display: "inline-block" }}></span>
-                          Translated Content ({translations.find(t => t.language.toLowerCase() === selectedLanguage.toLowerCase()).translationProvenance || "AI"})
-                        </div>
-                        <p style={{ margin: 0, fontSize: "14px", lineHeight: "1.6", color: "var(--text-primary)" }}>
-                          {translations.find(t => t.language.toLowerCase() === selectedLanguage.toLowerCase()).answer}
-                        </p>
-                      </div>
-                    ) : (
-                  isEditingQuestion ? (
+                  {isEditingQuestion ? (
                     <>
                     <select
                     value={editQuestionData.category}
@@ -780,7 +687,7 @@ const handleSubmitReply = async () => {
                         <label style={{ display: "block", marginBottom: "8px", fontSize: "14px", fontWeight: "500" }}>
                           Tags
                         </label>
-                        
+
                         {/* Display existing tags as removable chips */}
                         {editQuestionData.hashtags.length > 0 && (
                           <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "8px" }}>
@@ -824,7 +731,7 @@ const handleSubmitReply = async () => {
                             ))}
                           </div>
                         )}
-                        
+
                         <input
                           type="text"
                           value={currentTagInput}
@@ -878,8 +785,7 @@ const handleSubmitReply = async () => {
                   </>
                   ) : (
                         <p className="detail-description">{question.description}</p>
-                      )
-                )}
+                      )}
 
                     <div className="detail-hashtags">
                       {question.hashtags.map((tag) => (
@@ -1085,7 +991,62 @@ const handleSubmitReply = async () => {
                 </h2>
 
                 {answers && answers.map((answer) => (
-                  <div key={answer.id} className={`answer-card ${answer.isBest ? "best-answer" : ""}`}>
+                  <div key={answer.id} className={`answer-card ${answer.isBest ? "best-answer" : ""}`} style={{ position: "relative" }}>
+                    <div style={{ position: "absolute", top: "8px", right: "8px", zIndex: 5 }}>
+                      <button
+                        className="bookmark-btn icon-btn answer-dropdown-trigger"
+                        onClick={() => setOpenAnswerDropdownId(openAnswerDropdownId === answer.id ? null : answer.id)}
+                        aria-label="More options"
+                        data-tooltip="More options"
+                      >
+                        ⋯
+                      </button>
+                      {openAnswerDropdownId === answer.id && (
+                        <div
+                          className="answer-dropdown-menu"
+                          style={{
+                            position: "absolute",
+                            top: "calc(100% + 4px)",
+                            right: 0,
+                            background: theme === "dark" ? "#18181b" : "#fff",
+                            border: theme === "dark" ? "1px solid #2a2d3e" : "1px solid #e5e5e5",
+                            borderRadius: "6px",
+                            boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                            zIndex: 10,
+                            minWidth: "160px",
+                            display: "flex",
+                            flexDirection: "column",
+                            padding: "4px 0"
+                          }}
+                        >
+                          <button
+                            onClick={() => {
+                              setReportTarget({ type: "answer", id: answer.id });
+                              setShowReportModal(true);
+                              setOpenAnswerDropdownId(null);
+                            }}
+                            style={{
+                              background: "none",
+                              border: "none",
+                              width: "100%",
+                              textAlign: "left",
+                              padding: "8px 12px",
+                              fontSize: "13px",
+                              cursor: "pointer",
+                              color: theme === "dark" ? "#e5e5e5" : "#1a1a1a",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "8px"
+                            }}
+                            onMouseOver={e => e.currentTarget.style.background = theme === "dark" ? "#242424" : "#f5f5f5"}
+                            onMouseOut={e => e.currentTarget.style.background = "none"}
+                          >
+                            <span>🚩</span>
+                            <span>Report</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
                     <div className="vote-col">
                       <button
                         className={`upvote ${answer.voted ? "upvoted" : ""}`}
@@ -1165,19 +1126,19 @@ const handleSubmitReply = async () => {
                       <div className="avatar small">{answer.avatar}</div>
                       <strong>{answer.author}</strong>
                       {answer.authorId && question.authorId && String(answer.authorId) === String(question.authorId) && (
-                        <span style={{ 
-                          marginLeft: "6px", 
-                          fontSize: "10px", 
-                          fontWeight: "bold", 
-                          backgroundColor: "var(--primary-color, #3b82f6)", 
-                          color: "white", 
-                          padding: "2px 6px", 
-                          borderRadius: "4px" 
+                        <span style={{
+                          marginLeft: "6px",
+                          fontSize: "10px",
+                          fontWeight: "bold",
+                          backgroundColor: "var(--primary-color, #3b82f6)",
+                          color: "white",
+                          padding: "2px 6px",
+                          borderRadius: "4px"
                         }}>
                           OP
                         </span>
                       )}
-                    </div> 
+                    </div>
                     <div
                         style={{
                           marginLeft: "auto",
@@ -1208,15 +1169,6 @@ const handleSubmitReply = async () => {
                        )}
                          <span className="answer-time">{answer.time}</span>
                       </div>
-                      <button
-                        className="report-btn"
-                        onClick={() => {
-                          setReportTarget({ type: "answer", id: answer.id });
-                          setShowReportModal(true);
-                        }}
-                      >
-                        🚩
-                      </button>
                       {canEdit(answer) && (
                         <button
                           onClick={async () => {
@@ -1236,76 +1188,82 @@ const handleSubmitReply = async () => {
                               )
                             );
                           }}
-                          className="bookmark-btn"
+                          className="bookmark-btn icon-btn"
+                          data-tooltip={answer.isAnonymous ? "De-anonymize" : "Anonymize"}
+                          aria-label={answer.isAnonymous ? "De-anonymize" : "Anonymize"}
                         >
-                          {answer.isAnonymous ? <><Eye size={14} /> De-anonymize</> : <><EyeOff size={14} /> Anonymize</>}
+                          {answer.isAnonymous ? <Eye size={14} /> : <EyeOff size={14} />}
                         </button>
                       )}
                       {canEdit(answer) && (
                         <button
-                          className="bookmark-btn"
+                          className="bookmark-btn icon-btn"
                           onClick={() => {
                             setEditingAnswerId(answer.id);
                             setEditAnswerContent(answer.content);
                           }}
-                      >
-                        ✎ Edit
-                      </button>
-                    )}
-                    {canDelete(answer) && (
-                      <button
-                        className="bookmark-btn danger-button"
-                        onClick={() => {
-                          const confirmed = window.confirm(
-                            "Are you sure you want to delete this answer?"
-                          );
+                          data-tooltip="Edit"
+                          aria-label="Edit"
+                        >
+                          ✎
+                        </button>
+                      )}
+                      {canDelete(answer) && (
+                        <button
+                          className="bookmark-btn danger-button icon-btn"
+                          onClick={() => {
+                            const confirmed = window.confirm(
+                              "Are you sure you want to delete this answer?"
+                            );
 
-                          if (!confirmed) return;
+                            if (!confirmed) return;
 
-                          const deletedAnswer = answer;
+                            const deletedAnswer = answer;
 
-                          setAnswers((prev) =>
-                            prev.filter((item) => String(item.id) !== String(answer.id))
-                          );
-                          removeAnswerLocally(question.id, answer.id);
-                          let countdown = 10;
+                            setAnswers((prev) =>
+                              prev.filter((item) => String(item.id) !== String(answer.id))
+                            );
+                            removeAnswerLocally(question.id, answer.id);
+                            let countdown = 10;
 
-                          const intervalId = setInterval(() => {
-                            countdown--;
+                            const intervalId = setInterval(() => {
+                              countdown--;
 
-                            setPendingAnswerDelete((prev) => {
-                              if (!prev) return null;
+                              setPendingAnswerDelete((prev) => {
+                                if (!prev) return null;
 
-                              return {
-                                ...prev,
-                                countdown
-                              };
+                                return {
+                                  ...prev,
+                                  countdown
+                                };
+                              });
+                            }, 1000);
+
+                            const timeoutId = setTimeout(async () => {
+                              clearInterval(intervalId);
+
+                              try {
+                                await deleteAnswer(deletedAnswer.id);
+                                setPendingAnswerDelete(null);
+                                await loadAnswers(0);
+                              } catch (err) {
+                                setError(err.message || "Failed to delete answer.");
+                              }
+                            }, 10000);
+
+                            setPendingAnswerDelete({
+                              answer: deletedAnswer,
+                              countdown: 10,
+                              timeoutId,
+                              intervalId
                             });
-                          }, 1000);
-
-                          const timeoutId = setTimeout(async () => {
-                            clearInterval(intervalId);
-
-                            try {
-                              await deleteAnswer(deletedAnswer.id);
-                              setPendingAnswerDelete(null);
-                              await loadAnswers(0);
-                            } catch (err) {
-                              setError(err.message || "Failed to delete answer.");
-                            }
-                          }, 10000);
-
-                          setPendingAnswerDelete({
-                            answer: deletedAnswer,
-                            countdown: 10,
-                            timeoutId,
-                            intervalId
-                          });
-                        }}
-                      >
-                        🗑 Delete
-                      </button>
-                    )}
+                          }}
+                          data-tooltip="Delete"
+                          aria-label="Delete"
+                        >
+                          🗑
+                        </button>
+                      )}
                     </div>
                     {activeBounty && (String(activeBounty.createdBy) === String(user?.id) || user?.role === "admin") && (
                       <button
@@ -1432,9 +1390,9 @@ const handleSubmitReply = async () => {
                     </div>
                   )}
                   <label style={{ display: "block", marginBottom: "8px", fontWeight: "600", fontSize: "14px" }}>Reason for reporting</label>
-                  <select 
-                    className="modal-input" 
-                    value={reportReason} 
+                  <select
+                    className="modal-input"
+                    value={reportReason}
                     onChange={(e) => setReportReason(e.target.value)}
                     disabled={reportLoading}
                     style={{ marginBottom: "16px" }}
@@ -1445,10 +1403,10 @@ const handleSubmitReply = async () => {
                     <option value="off-topic">Off-topic</option>
                     <option value="other">Other</option>
                   </select>
-                  
+
                   <label style={{ display: "block", marginBottom: "8px", fontWeight: "600", fontSize: "14px" }}>Additional Details (Optional)</label>
-                  <textarea 
-                    className="modal-input" 
+                  <textarea
+                    className="modal-input"
                     placeholder="Provide any additional context..."
                     value={reportDetails}
                     onChange={(e) => setReportDetails(e.target.value)}
@@ -1458,9 +1416,9 @@ const handleSubmitReply = async () => {
                   />
                   <div className="modal-footer" style={{ marginTop: "24px" }}>
                     <button className="modal-cancel" onClick={() => setShowReportModal(false)} disabled={reportLoading}>Cancel</button>
-                    <button 
-                      className="modal-submit" 
-                      onClick={handleReportSubmit} 
+                    <button
+                      className="modal-submit"
+                      onClick={handleReportSubmit}
                       disabled={reportLoading}
                       style={{ backgroundColor: "#ef4444", borderColor: "#ef4444" }}
                     >

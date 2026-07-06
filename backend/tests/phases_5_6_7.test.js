@@ -19,7 +19,7 @@ describe("Phases 5, 6, and 7 Integration Tests", () => {
     process.env.NODE_ENV = "test";
     process.env.JWT_SECRET = "test_secret_567";
     process.env.SQLITE_PATH = testDbPath;
-    
+
     jest.resetModules();
 
     const sqlite = require("../db/sqlite");
@@ -199,43 +199,6 @@ describe("Phases 5, 6, and 7 Integration Tests", () => {
       expect(res.status).toBe(200);
       expect(res.body.status).toBe("success");
       expect(res.body.data.response).toBeDefined();
-    });
-  });
-
-  describe("Phase 6: Multi-language FAQ Translations", () => {
-    let targetFaqId;
-
-    beforeAll(async () => {
-      const db = getSQLiteDb();
-      const res = await db.run(
-        `INSERT INTO faqs (question, answer, category, tags) VALUES (?, ?, ?, ?)`,
-        "Where is the cafeteria located?",
-        "It is located on the second floor.",
-        "General",
-        "cafeteria"
-      );
-      targetFaqId = res.lastID;
-    });
-
-    test("users can translate FAQs and fetch them in target language", async () => {
-      const translateRes = await request(app)
-        .post(`/api/faqs/${targetFaqId}/translations`)
-        .set("Authorization", `Bearer ${userToken}`)
-        .send({
-          language: "Spanish",
-          question: "¿Dónde está la cafetería?",
-          answer: "Está ubicada en el segundo piso."
-        });
-
-      expect(translateRes.status).toBe(201);
-
-      const fetchRes = await request(app)
-        .get(`/api/faqs/${targetFaqId}/translations`);
-
-      expect(fetchRes.status).toBe(200);
-      expect(fetchRes.body.data.length).toBe(1);
-      expect(fetchRes.body.data[0].language).toBe("Spanish");
-      expect(fetchRes.body.data[0].question).toBe("¿Dónde está la cafetería?");
     });
   });
 

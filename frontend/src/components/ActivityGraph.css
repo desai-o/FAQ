@@ -5,10 +5,11 @@
 .graph-card {
   background: var(--bg-white, #ffffff);
   border-radius: var(--radius-lg, 20px);
-  padding: 24px 28px;
+  padding: 24px 28px 28px;
   border: 1px solid var(--border, #e5e5e5);
-  margin-bottom: 28px;
+  margin-bottom: 12px;
   width: 100%;
+  min-height: 100%;
   box-shadow: var(--shadow-card, 0 8px 24px rgba(0,0,0,0.08));
   font-family: var(--font-main, sans-serif);
   box-sizing: border-box;

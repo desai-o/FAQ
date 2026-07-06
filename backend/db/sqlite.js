@@ -272,21 +272,6 @@ async function connectSQLite() {
   `);
 
   await sqliteDb.exec(`
-    CREATE TABLE IF NOT EXISTS faq_translations (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      mongo_id TEXT,
-      faq_id TEXT NOT NULL,
-      language TEXT NOT NULL,
-      question TEXT NOT NULL,
-      answer TEXT NOT NULL,
-      translated_by TEXT DEFAULT 'ai',
-      translation_provenance TEXT,
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE(faq_id, language)
-    );
-  `);
-
-  await sqliteDb.exec(`
     CREATE TABLE IF NOT EXISTS bounties (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       mongo_id TEXT,

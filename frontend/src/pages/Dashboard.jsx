@@ -29,11 +29,18 @@ function Dashboard() {
             <p>Ask questions, discover answers, and learn from your community.</p>
           </section>
 
-          <StatsGrid />
+          <section className="dashboard-overview">
+            <div className="dashboard-overview-left">
+              <div className="stats-panel">
+                <StatsGrid />
+              </div>
+              <CommunityHeatmap />
+            </div>
 
-          <ActivityGraph />
-
-          <CommunityHeatmap />
+            <div className="dashboard-overview-right">
+              <ActivityGraph />
+            </div>
+          </section>
 
           <div className="dashboard-grid">
             <div className="dashboard-main">

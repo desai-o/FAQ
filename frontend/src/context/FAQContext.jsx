@@ -650,6 +650,7 @@ export function FAQProvider({ children }) {
 
       // Important: reload from both /faqs and /queries after server write.
       await loadQuestionsFromAllSources();
+      window.dispatchEvent(new CustomEvent("stats:refresh"));
 
       return serverQuestion;
     } catch (error) {
@@ -814,6 +815,8 @@ const restoreAnswerLocally = (questionId, answer) => {
             : q
         )
       );
+
+      window.dispatchEvent(new CustomEvent("stats:refresh"));
 
       return newAnswer;
     } catch (err) {

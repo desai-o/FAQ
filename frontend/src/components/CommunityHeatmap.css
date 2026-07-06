@@ -3,14 +3,14 @@
    ============================================= */
 
 .heatmap-card {
-  background: var(--bg-white, #ffffff);
-  border-radius: 16px;
-  padding: 20px 24px;
-  border: 1px solid var(--border, #e5e5e5);
-  margin-bottom: 28px;
-  max-width: 780px;
+  background: transparent;
+  border-radius: 12px;
+  padding: 12px 14px 18px;
+  border: none;
+  margin-bottom: 12px;
+  max-width: none;
   width: 100%;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  box-shadow: none;
   position: relative;
   font-family: var(--font-main, sans-serif);
   box-sizing: border-box;
@@ -20,7 +20,7 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 16px;
+  margin-bottom: 10px;
 }
 
 .heatmap-title-group h2 {
@@ -109,7 +109,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 20px;
+  margin-bottom: 12px;
 }
 
 .heatmap-total-interactions {
@@ -148,6 +148,7 @@
 /* Heatmap Grid */
 .heatmap-grid-container {
   overflow-x: auto;
+  padding-top: 8px;
   padding-bottom: 6px;
 }
 
@@ -289,9 +290,9 @@
    ========================= */
 
 [data-theme="dark"] .heatmap-card {
-  background: #000000;
-  border-color: #222222;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
 }
 
 [data-theme="dark"] .heatmap-title-group h2,
