@@ -1,50 +1,49 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
-import { useFAQ } from "../../context/FAQContext";
-import { fetchUserRecentAnswers } from "../../api/faqApi";
+import {
+  fetchNotifications,
+  markNotificationsAsRead
+} from "../../api/faqApi";
 
 // ---------------------------------------------------------------------------
-// RecentActivity — Pass 1 wiring
+// RecentActivity — Pass 3 wiring
 // ---------------------------------------------------------------------------
-// Replaces the hardcoded sample feed with a chronological list derived from
-// FAQContext.questions for the logged-in user. No new endpoints, no model
-// changes — only existing frontend state is consulted.
+// Replaces the previous cache-derived feed ("Asked <title>" / "Answered
+// <title>" reconstructed from FAQContext.questions plus
+// fetchUserRecentAnswers) with the server-authoritative notifications
+// feed:
+//   GET  /api/notifications           → list of activity events
+//   POST /api/notifications/read      → mark all as read
 //
-// Each event corresponds to one of two signals we can verify purely from
-// the cache:
-//   - "Asked <title>"             when the user authored the question
-//   - "Answered <parent title>"   when one of the nested answers was
-//                                  authored by the user
+// Each notification carries:
+//   eventType   (e.g. "answer_accepted", "follow", "mention", "comment",
+//               "bookmark") — drives the colored dot
+//   message     — server-rendered activity text, used directly
+//   createdAt   — drives the relative timestamp
+//   isRead      — drives dot opacity and the "Mark all read" affordance
 //
-// The "Earned a badge" sample from the original hardcoded list is NOT
-// reproduced — badge state is not carried in FAQContext and synthesizing
-// it from arbitrary data would be misleading. The feed shows only events
-// the codebase can actually attribute to the current user.
-//
-// Identifier resolution (q.userId / q.user_id / q.authorId, both sides
-// stringified) matches ProfileStats, RecentContent, and TopFAQ so all four
-// sections agree on which items belong to the current user.
-//
-// Pass 2 wiring (this revision):
-//   On mount we additionally call GET /api/answers/user/:userId so the
-//   "Answered <title>" entries survive a hard refresh. FAQContext only
-//   carries questions; the Answer objects are loaded per-question when
-//   the user opens a question, so without this fetch the activity feed
-//   can only see answers that happen to be nested in the currently cached
-//   questions — which is why a freshly posted answer disappears after
-//   reload. The local-cache branch is kept so the new answer still shows
-//   up instantly while the fetch is in flight.
+// Loading, empty, and error states are handled inline so the card shell,
+// header, and "View all" button stay identical to the previous design.
 // ---------------------------------------------------------------------------
 
-const COLORS = {
-  asked: "#D97706",
-  answered: "#2563EB"
+// Color for the leading dot, keyed off the server-supplied eventType.
+// Unknown / missing eventType falls back to a neutral gray so we never
+// paint an undefined color into the DOM.
+const EVENT_COLORS = {
+  answer_accepted: "#10b981",
+  accepted: "#10b981",
+  follow: "#2563eb",
+  followed: "#2563eb",
+  new_answer: "#0ea5e9",
+  mention: "#8b5cf6",
+  comment: "#8b5cf6",
+  bookmark: "#d97706"
 };
+const DEFAULT_EVENT_COLOR = "#64748b";
 
-function matchUser(item, userId) {
-  const qUserId = item.userId || item.user_id || item.authorId;
-  if (!qUserId || !userId) return false;
-  return String(qUserId) === userId;
+function colorForEvent(eventType) {
+  if (!eventType) return DEFAULT_EVENT_COLOR;
+  return EVENT_COLORS[eventType] || DEFAULT_EVENT_COLOR;
 }
 
 // Relative-time formatter. Mirrors the rhythm of the original hardcoded
@@ -81,114 +80,135 @@ function formatTimestamp(iso) {
 }
 
 function RecentActivity() {
-  const { questions } = useFAQ();
   const { user } = useAuth();
 
-  // Server-side recent answers for the current user. Fetched once on
-  // mount (and whenever the logged-in user changes). This is what makes
-  // the "Answered <title>" rows survive a hard refresh: the local FAQ
-  // cache never carries the full set of answers for the user, only the
-  // answers nested under questions that have been opened.
-  const [userAnswers, setUserAnswers] = useState([]);
+  // Notifications fetched from the server. Authoritative — survives hard
+  // refresh, includes events the local FAQ cache can never reconstruct
+  // (e.g. someone accepted your answer, someone followed you).
+  const [notifications, setNotifications] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [marking, setMarking] = useState(false);
 
   useEffect(() => {
-    if (!user?.id) {
-      setUserAnswers([]);
+    if (!user) {
+      setNotifications([]);
+      setLoading(false);
       return;
     }
     let cancelled = false;
-    fetchUserRecentAnswers(String(user.id), 20)
+    setLoading(true);
+    setError(null);
+    fetchNotifications()
       .then((res) => {
         if (cancelled) return;
         const items = Array.isArray(res?.data) ? res.data : [];
-        setUserAnswers(items);
+        setNotifications(items);
       })
-      .catch(() => {
+      .catch((err) => {
         if (cancelled) return;
-        // Failure is non-fatal: the local-cache branch below still
-        // renders whatever is already in FAQContext.
-        setUserAnswers([]);
+        setError(err?.message || "Couldn't load activity. Please try again.");
+        setNotifications([]);
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setLoading(false);
       });
     return () => {
       cancelled = true;
     };
-  }, [user?.id]);
+  }, [user]);
 
   if (!user) return null;
 
-  const userId = user.id ? String(user.id) : "";
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
 
-  const events = [];
-  const answeredIds = new Set();
-
-  // Authoritative "Answered" entries from the server. These persist
-  // across page refreshes because they're backed by the Answer document
-  // in the database, not by transient client cache.
-  for (const a of userAnswers || []) {
-    const aid = a.id != null ? String(a.id) : null;
-    if (aid) answeredIds.add(aid);
-    events.push({
-      key: aid ? `answered-api-${aid}` : `answered-api-${Math.random()}`,
-      text: `Answered "${a.title || "Untitled"}"`,
-      time: formatTimestamp(a.createdAt),
-      iso: a.createdAt,
-      color: COLORS.answered
+  // Newest first. Notifications without a parseable timestamp sink to
+  // the bottom (their `iso` produces NaN which sorts as 0).
+  const events = notifications
+    .map((n, idx) => ({
+      key: n.id != null ? `notif-${n.id}` : `notif-${idx}`,
+      text: n.message || "New activity",
+      time: formatTimestamp(n.createdAt),
+      iso: n.createdAt,
+      color: colorForEvent(n.eventType),
+      isRead: !!n.isRead
+    }))
+    .sort((a, b) => {
+      const aT = new Date(a.iso || 0).getTime();
+      const bT = new Date(b.iso || 0).getTime();
+      return bT - aT;
     });
-  }
 
-  for (const q of questions || []) {
-    if (matchUser(q, userId)) {
-      const ts = q.createdAt || q.updatedAt;
-      events.push({
-        key: `asked-${q.id}`,
-        text: `Asked "${q.title || q.question || "Untitled"}"`,
-        time: formatTimestamp(ts),
-        iso: ts,
-        color: COLORS.asked
-      });
+  const handleMarkAllRead = async () => {
+    if (marking || unreadCount === 0) return;
+    setMarking(true);
+    try {
+      await markNotificationsAsRead();
+      // Optimistic local update — server endpoint marks all as read.
+      setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    } catch (err) {
+      console.error("Failed to mark notifications as read:", err);
+    } finally {
+      setMarking(false);
     }
-
-    const answers = Array.isArray(q.answers) ? q.answers : [];
-    for (const a of answers) {
-      const aUserId = a.userId || a.user_id || a.authorId;
-      if (!aUserId || String(aUserId) !== userId) continue;
-
-      const aid = a.id != null ? String(a.id) : (a._id != null ? String(a._id) : null);
-      // Skip duplicates already provided by the server response — the
-      // server entry has the canonical timestamp and parent title.
-      if (aid && answeredIds.has(aid)) continue;
-
-      // Prefer the answer's own timestamp; fall back to the parent
-      // question if the source didn't carry one (locally-added answers,
-      // for example, only get `time: "Just now"`).
-      const ts = a.createdAt || a.created_at || q.createdAt || q.updatedAt;
-
-      events.push({
-        key: aid ? `answered-local-${aid}` : `answered-local-${q.id}-${Math.random()}`,
-        text: `Answered "${q.title || q.question || "Untitled"}"`,
-        time: formatTimestamp(ts),
-        iso: ts,
-        color: COLORS.answered
-      });
-    }
-  }
-
-  // Newest first. Events without a parseable timestamp sink to the bottom
-  // (their `iso` produces NaN which sorts as 0).
-  events.sort((a, b) => {
-    const aT = new Date(a.iso || 0).getTime();
-    const bT = new Date(b.iso || 0).getTime();
-    return bT - aT;
-  });
+  };
 
   return (
     <div className="activity-card profile-card">
       <div className="card-header-row">
         <h3>Recent Activity</h3>
-        <button className="view-all-btn">View all</button>
+        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+          {unreadCount > 0 && !loading && !error && (
+            <button
+              type="button"
+              onClick={handleMarkAllRead}
+              disabled={marking}
+              className="mark-read-btn"
+              style={{
+                padding: "4px 10px",
+                fontSize: "12px",
+                borderRadius: "6px",
+                border: "1px solid var(--border, #e2e8f0)",
+                background: "var(--surface-secondary, #f8fafc)",
+                color: "var(--text-primary, #1e293b)",
+                cursor: marking ? "wait" : "pointer",
+                opacity: marking ? 0.7 : 1
+              }}
+            >
+              {marking ? "Marking…" : `Mark all read (${unreadCount})`}
+            </button>
+          )}
+          <button className="view-all-btn">View all</button>
+        </div>
       </div>
 
-      {events.length === 0 ? (
+      {loading ? (
+        <div
+          className="activity-loading"
+          style={{
+            padding: "20px 16px",
+            textAlign: "center",
+            color: "var(--text-secondary, #64748b)",
+            fontSize: "13px"
+          }}
+        >
+          Loading activity…
+        </div>
+      ) : error ? (
+        <div
+          className="activity-error"
+          style={{
+            padding: "20px 16px",
+            textAlign: "center",
+            color: "#ef4444",
+            fontSize: "13px",
+            lineHeight: 1.5
+          }}
+        >
+          <p style={{ margin: 0, fontWeight: 600 }}>{error}</p>
+        </div>
+      ) : events.length === 0 ? (
         <div
           className="activity-empty"
           style={{
@@ -212,7 +232,10 @@ function RecentActivity() {
             <li key={e.key} className="activity-item">
               <span
                 className="activity-dot"
-                style={{ background: e.color }}
+                style={{
+                  background: e.color,
+                  opacity: e.isRead ? 0.5 : 1
+                }}
               />
               <div className="activity-text">
                 <p>{e.text}</p>
