@@ -16,10 +16,20 @@ import { useNavigate } from "react-router-dom";
 //   - "My FAQs"          -> questions authored by current user (same
 //                           identifier resolution as ProfileStats,
 //                           RecentContent, TopFAQ, RecentActivity).
+//                           Click navigates to /profile with state
+//                           { activeTab: "My Content" }, so it lands on
+//                           the existing MyContentTab. The sub-tab
+//                           defaults to "My FAQs Created" (set inside
+//                           MyContentTab itself), so no extra sub-tab
+//                           state is needed here.
 //   - "Draft FAQs"       -> authored questions whose status is NOT in the
-//                           {resolved, approved, published} set.
+//                           {resolved, approved, published} set. Click
+//                           navigates to /profile with the same
+//                           activeTab state as "My FAQs".
 //   - "Published FAQs"   -> authored questions whose status IS in that
 //                           set. (Draft + Published == My FAQs total.)
+//                           Click navigates to /profile with the same
+//                           activeTab state as "My FAQs".
 //   - "Bookmarked FAQs"  -> any question with q.bookmarked === true.
 //                           FAQContext.loadBookmarks() merges the
 //                           backend /api/bookmarks set into the cache for
@@ -70,47 +80,60 @@ function QuickLinks() {
     }
   }
 
+  // All three of these route to the same destination — the Profile page's
+  // existing "My Content" tab. MyContentTab defaults its internal sub-tab
+  // to "My FAQs Created", so we only need to set the top-level activeTab
+  // and the right page renders.
+  const MY_CONTENT_TAB_STATE = { activeTab: "My Content" };
+
   const quickLinks = [
-  {
-    label: "My FAQs",
-    count: myCount,
-    path: "/questions",
-    Icon: () => <MessagePlusIcon size={15} color="#64748b" />
-  },
-  {
-    label: "Draft FAQs",
-    count: draftCount,
-    path: "/questions",
-    Icon: () => <PencilIcon size={15} color="#64748b" />
-  },
-  {
-    label: "Published FAQs",
-    count: publishedCount,
-    path: "/questions",
-    Icon: () => <SendIcon size={15} color="#64748b" />
-  },
-  {
-    label: "Bookmarked FAQs",
-    count: bookmarkedCount,
-    path: "/bookmarks",
-    Icon: () => <BookmarkIcon size={15} color="#64748b" />
-  },
-  {
-    label: "Recently Viewed",
-    count: "—",
-    path: "/questions",
-    Icon: () => <ClockIcon size={15} color="#64748b" />,
-    countTitle:
-      "Recently viewed history isn't tracked yet, so a count isn't available from the existing frontend data."
-  }
-];
+    {
+      label: "My FAQs",
+      count: myCount,
+      path: "/profile",
+      state: MY_CONTENT_TAB_STATE,
+      Icon: () => <MessagePlusIcon size={15} color="#64748b" />
+    },
+    {
+      label: "Draft FAQs",
+      count: draftCount,
+      path: "/profile",
+      state: MY_CONTENT_TAB_STATE,
+      Icon: () => <PencilIcon size={15} color="#64748b" />
+    },
+    {
+      label: "Published FAQs",
+      count: publishedCount,
+      path: "/profile",
+      state: MY_CONTENT_TAB_STATE,
+      Icon: () => <SendIcon size={15} color="#64748b" />
+    },
+    {
+      label: "Bookmarked FAQs",
+      count: bookmarkedCount,
+      path: "/bookmarks",
+      Icon: () => <BookmarkIcon size={15} color="#64748b" />
+    },
+    {
+      label: "Recently Viewed",
+      count: "—",
+      path: "/questions",
+      Icon: () => <ClockIcon size={15} color="#64748b" />,
+      countTitle:
+        "Recently viewed history isn't tracked yet, so a count isn't available from the existing frontend data."
+    }
+  ];
 
   return (
     <div className="quick-links-card profile-card">
       <h3 className="quick-links-heading">Quick Links</h3>
       <div className="quick-links">
         {quickLinks.map((link) => (
-          <button key={link.label} className="quick-link-row" onClick={() => navigate(link.path)}>
+          <button
+            key={link.label}
+            className="quick-link-row"
+            onClick={() => navigate(link.path, { state: link.state })}
+          >
             <span className="quick-link-icon"><link.Icon /></span>
             <span className="quick-link-label">{link.label}</span>
             <span

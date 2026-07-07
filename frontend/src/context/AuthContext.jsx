@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect } from "react";
+import { updateUserProfile } from "../api/faqApi";
 
 const AuthContext = createContext();
 
@@ -151,6 +152,20 @@ export function AuthProvider({ children }) {
     });
   };
 
+  // Persist a profile update (name, bio, location) to the server and merge
+  // the returned user object into local state so the Profile page reflects
+  // the new values immediately. The /auth/me PATCH response uses the same
+  // { data, meta: { user } } shape as /me, so we read defensively.
+  const updateProfile = async (payload) => {
+    const response = await updateUserProfile(payload);
+    const updatedUser =
+      response?.data?.data || response?.data?.meta?.user || response?.data;
+    if (updatedUser && typeof updatedUser === "object") {
+      setUser(updatedUser);
+    }
+    return updatedUser;
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -161,7 +176,8 @@ export function AuthProvider({ children }) {
         signup,
         logout,
         incrementAnswersCount,
-        incrementQuestionsCount
+        incrementQuestionsCount,
+        updateProfile
       }}
     >
       {children}

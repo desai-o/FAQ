@@ -185,6 +185,16 @@ export async function updateAnswer(id, payload) {
   });
 }
 
+// Update the authenticated user's editable profile fields (name, bio,
+// location). Calls PATCH /auth/me; the response echoes the updated user
+// under .data / .meta.user, matching the rest of the auth endpoints.
+export async function updateUserProfile(payload) {
+  return request("/auth/me", {
+    method: "PATCH",
+    body: JSON.stringify(payload)
+  });
+}
+
 export async function followResource(followableType, followableId) {
   return request("/follows", {
     method: "POST",

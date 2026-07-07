@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { PencilIcon, UsersIcon, MapPinIcon, MailIcon } from "./ProfileIcons";
 import { useAuth } from "../../context/AuthContext";
+import EditProfileModal from "./EditProfileModal";
 
 const getInitials = (name) => {
   if (!name) return "?";
@@ -55,12 +57,23 @@ const formatMemberSince = (iso) => {
   });
 };
 
+// Slug derived from `name`, used as a fallback handle for users who
+// haven't picked a username yet. Lowercased and stripped of any chars
+// outside [a-z0-9] to keep it URL-/mention-safe.
+const slugFromName = (name) =>
+  (name || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+
 function ProfileHeader() {
   const { user } = useAuth();
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   if (!user) return null;
 
-  const handle = `@${user.name.toLowerCase().replace(/[^a-z0-9]/g, "")}`;
+  // Username is a separate, user-chosen handle. We prefer it when set;
+  // otherwise fall back to a name-based slug so the UI still renders a
+  // sensible @-handle for legacy users.
+  const handleSource = (user.username && user.username.trim()) || slugFromName(user.name);
+  const handle = handleSource ? `@${handleSource}` : "@user";
   const role = (user.role || "student").toLowerCase();
 
   // Live data (already on AuthContext.user)
@@ -71,6 +84,10 @@ function ProfileHeader() {
   const location = user.location || PLACEHOLDER_LOCATION;
   const bio = user.bio || DEFAULT_BIO;
   const memberSince = formatMemberSince(user.createdAt) || PLACEHOLDER_MEMBER_SINCE;
+  // The "Username" row in the details grid shows the persisted value
+  // directly. Empty string renders as "Not set" so users can tell at a
+  // glance whether they've picked a handle.
+  const usernameDisplay = (user.username && user.username.trim()) || "Not set";
 
   return (
     <section className="profile-header-card">
@@ -122,12 +139,15 @@ function ProfileHeader() {
       </div>
 
       <div className="profile-header-right">
-        <button className="edit-profile-btn">
+        <button
+          className="edit-profile-btn"
+          onClick={() => setIsEditModalOpen(true)}
+        >
           <PencilIcon size={13} color="#374151" /> Edit Profile
         </button>
         <div className="profile-details-grid">
           {[
-            ["Username",     handle],
+            ["Username",     usernameDisplay],
             ["Email",        user.email],
             ["Role",         capitalize(role)],
             ["Storage Mode", user.storage === "mongodb" ? "MongoDB Atlas" : "SQLite Fallback"],
@@ -140,6 +160,11 @@ function ProfileHeader() {
           ))}
         </div>
       </div>
+
+      <EditProfileModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+      />
     </section>
   );
 }
