@@ -108,7 +108,11 @@ export async function toggleBookmarkApi(payload) {
 }
 
 export async function fetchBookmarks() {
-  return request("/bookmarks");
+  return request(`/bookmarks`);
+}
+
+export async function fetchOverviewStats() {
+  return request("/stats/overview");
 }
 
 export async function fetchActivityStats(range = "week") {
@@ -222,15 +226,8 @@ export async function sendChatMessage(message, history = []) {
   });
 }
 
-export async function createFaqTranslation(faqId, payload) {
-  return request(`/faqs/${faqId}/translations`, {
-    method: "POST",
-    body: JSON.stringify(payload)
-  });
-}
-
-export async function fetchFaqTranslations(faqId) {
-  return request(`/faqs/${faqId}/translations`);
+export async function fetchChatStatus() {
+  return request("/chat/status");
 }
 
 export async function createBounty(payload) {

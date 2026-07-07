@@ -5,6 +5,10 @@ const { isMongoAvailable } = require("../db/mongo");
 const { getSQLiteDb } = require("../db/sqlite");
 const Event = require("../models/Event");
 
+// Map a heatmap range key to the start of its 7-day window.
+// "week"        -> last 7 days (rolling, used for "This Week")
+// "last_week"   -> 7-13 days ago (fixed, used for "Last Week")
+// "two_weeks_ago" -> 14-20 days ago (fixed, used for "Two Weeks Ago")
 function getStartDate(range) {
   const now = new Date();
 
@@ -12,6 +16,12 @@ function getStartDate(range) {
     now.setDate(now.getDate() - 30);
   } else if (range === "year") {
     now.setDate(now.getDate() - 365);
+  } else if (range === "last_week") {
+    now.setDate(now.getDate() - 13);
+    now.setHours(0, 0, 0, 0);
+  } else if (range === "two_weeks_ago") {
+    now.setDate(now.getDate() - 20);
+    now.setHours(0, 0, 0, 0);
   } else {
     // For rolling 7 days, set to start of 6 days ago (today + past 6 days)
     now.setDate(now.getDate() - 6);
@@ -19,6 +29,24 @@ function getStartDate(range) {
   }
 
   return now;
+}
+
+// Exclusive upper bound for fixed-window ranges (last_week, two_weeks_ago).
+// Returns null for rolling ranges so all data from startDate onward is kept.
+function getEndDate(range) {
+  if (range === "last_week") {
+    const end = new Date();
+    end.setDate(end.getDate() - 7);
+    end.setHours(0, 0, 0, 0);
+    return end;
+  }
+  if (range === "two_weeks_ago") {
+    const end = new Date();
+    end.setDate(end.getDate() - 14);
+    end.setHours(0, 0, 0, 0);
+    return end;
+  }
+  return null;
 }
 
 function getDayLabel(date) {
@@ -55,7 +83,7 @@ function populateFallbackHeatmap(map) {
       "4 PM": 1.5,
       "8 PM": 0.9
     };
-    
+
     const dayMultipliers = {
       "Mon": 1.0,
       "Tue": 1.1,
@@ -70,7 +98,7 @@ function populateFallbackHeatmap(map) {
       const item = map[key];
       const tMult = timeMultipliers[item.time] || 1.0;
       const dMult = dayMultipliers[item.day] || 1.0;
-      
+
       const baseInteractions = Math.round(15 * tMult * dMult);
       if (baseInteractions > 0) {
         item.questions = Math.round(baseInteractions * 0.2);
@@ -81,6 +109,92 @@ function populateFallbackHeatmap(map) {
     }
   }
 }
+
+const ACTIVE_WINDOW_DAYS = 30;
+
+function getActiveSinceDate() {
+  const since = new Date();
+  since.setDate(since.getDate() - ACTIVE_WINDOW_DAYS);
+  return since;
+}
+
+router.get("/overview", async (req, res) => {
+  try {
+    const db = getSQLiteDb();
+
+    const [usersRow, faqsRow, queriesRow, answersRow] = await Promise.all([
+      db.get("SELECT COUNT(*) AS count FROM users"),
+      db.get("SELECT COUNT(*) AS count FROM faqs"),
+      db.get("SELECT COUNT(*) AS count FROM user_queries"),
+      db.get("SELECT COUNT(*) AS count FROM answers")
+    ]);
+
+    const sqliteCounts = {
+      users: usersRow ? usersRow.count : 0,
+      questionsAsked: (faqsRow ? faqsRow.count : 0) + (queriesRow ? queriesRow.count : 0),
+      answersPosted: answersRow ? answersRow.count : 0
+    };
+
+    let mongoCounts = null;
+
+    if (isMongoAvailable()) {
+      const [users, faqs, queries, answers] = await Promise.all([
+        require("../models/User").countDocuments(),
+        require("../models/FAQ").countDocuments(),
+        require("../models/UserQuery").countDocuments(),
+        require("../models/Answer").countDocuments()
+      ]);
+
+      mongoCounts = {
+        users,
+        questionsAsked: faqs + queries,
+        answersPosted: answers
+      };
+    }
+
+    const activeSince = getActiveSinceDate();
+    const activeRows = await db.all(
+      `SELECT DISTINCT user_id AS user_id
+         FROM events
+        WHERE datetime(created_at) >= datetime(?)
+          AND user_id IS NOT NULL
+          AND user_id <> ''
+          AND user_id <> 'anonymous'`,
+      activeSince.toISOString()
+    );
+
+    const distinctActive = activeRows
+      .map((row) => row.user_id)
+      .filter(Boolean);
+
+    const totalUsers = Math.max(sqliteCounts.users, mongoCounts?.users || 0);
+    const activeMembers = distinctActive.length > 0 ? distinctActive.length : totalUsers;
+    const questionsAsked = Math.max(sqliteCounts.questionsAsked, mongoCounts?.questionsAsked || 0);
+    const answersPosted = Math.max(sqliteCounts.answersPosted, mongoCounts?.answersPosted || 0);
+
+    return res.json({
+      status: "success",
+      storage: sqliteCounts.questionsAsked > 0 || sqliteCounts.answersPosted > 0 ? "sqlite" : (mongoCounts ? "mongodb" : "sqlite"),
+      data: {
+        questionsAsked,
+        activeMembers,
+        answersPosted
+      },
+      meta: {
+        activeWindowDays: ACTIVE_WINDOW_DAYS,
+        distinctActiveInWindow: distinctActive.length,
+        totalUsers,
+        sqliteCounts,
+        mongoCounts
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: "Failed to generate overview stats",
+      details: error.message
+    });
+  }
+});
 
 router.get("/activity", async (req, res) => {
   try {
@@ -187,6 +301,7 @@ router.get("/heatmap", async (req, res) => {
   try {
     const range = req.query.range || "week";
     const startDate = getStartDate(range);
+    const endDate = getEndDate(range);
 
     const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
     const slots = ["12 AM", "4 AM", "8 AM", "12 PM", "4 PM", "8 PM"];
@@ -220,11 +335,12 @@ router.get("/heatmap", async (req, res) => {
     let events = [];
 
     if (isMongoAvailable()) {
-      events = await Event.find({
-        createdAt: {
-          $gte: startDate
-        }
-      });
+      const mongoFilter = { createdAt: { $gte: startDate } };
+      if (endDate) {
+        mongoFilter.createdAt.$lt = endDate;
+      }
+
+      events = await Event.find(mongoFilter);
 
       for (const event of events) {
         const day = getDayLabel(event.createdAt);
@@ -255,14 +371,15 @@ router.get("/heatmap", async (req, res) => {
 
     const db = getSQLiteDb();
 
-    events = await db.all(
-      `
-      SELECT *
-      FROM events
-      WHERE datetime(created_at) >= datetime(?)
-      `,
-      startDate.toISOString()
-    );
+    let sql = `SELECT * FROM events WHERE datetime(created_at) >= datetime(?)`;
+    const params = [startDate.toISOString()];
+
+    if (endDate) {
+      sql += ` AND datetime(created_at) < datetime(?)`;
+      params.push(endDate.toISOString());
+    }
+
+    events = await db.all(sql, ...params);
 
     for (const event of events) {
       const day = getDayLabel(event.created_at);
@@ -314,7 +431,7 @@ router.get("/journey", requireAuth, async (req, res) => {
       const answeredCount = await Answer.countDocuments({ userId });
 
       const viewedFaqs = await FAQ.find({ _id: { $in: viewedFaqIds } }).lean();
-      
+
       const topicCoverage = {};
       viewedFaqs.forEach((faq) => {
         topicCoverage[faq.category] = (topicCoverage[faq.category] || 0) + 1;

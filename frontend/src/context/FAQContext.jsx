@@ -658,6 +658,7 @@ export function FAQProvider({ children }) {
 
       // Important: reload from both /faqs and /queries after server write.
       await loadQuestionsFromAllSources();
+      window.dispatchEvent(new CustomEvent("stats:refresh"));
 
       return serverQuestion;
     } catch (error) {
@@ -833,6 +834,8 @@ const restoreAnswerLocally = (questionId, answer) => {
       // Keep the AuthContext user snapshot in sync so the Profile page's
       // "Answers Submitted" stat updates immediately, without a full reload.
       incrementAnswersCount();
+
+      window.dispatchEvent(new CustomEvent("stats:refresh"));
 
       return newAnswer;
     } catch (err) {

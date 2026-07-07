@@ -272,9 +272,11 @@ function Contributors() {
                             {user.trend === "down" && <span style={{ color: "var(--accent-red)", fontSize: "10px", marginLeft: "4px" }} title="Falling">▼</span>}
                             {user.trend === "flat" && <span style={{ color: "var(--text-light)", fontSize: "10px", marginLeft: "4px" }} title="Stable">•</span>}
                           </td>
-                          <td className="user-cell">
-                            <div className="avatar small">{user.avatar}</div>
-                            <span>{user.name}</span>
+                          <td>
+                            <div className="user-cell">
+                              <div className="avatar small">{user.avatar}</div>
+                              <span>{user.name}</span>
+                            </div>
                           </td>
                           <td>
                             {user.badges && user.badges.length > 0 ? (
