@@ -1,12 +1,11 @@
-import { GridIcon, FileIcon, MessageCircleIcon, BarChartIcon, MedalIcon, SettingsIcon } from "./ProfileIcons";
+import { GridIcon, FileIcon, BarChartIcon, MedalIcon, SettingsIcon } from "./ProfileIcons";
 
 const tabs = [
-  { label: "Overview",         Icon: GridIcon          },
-  { label: "My Content",       Icon: FileIcon          },
-  { label: "Answers",          Icon: MessageCircleIcon },
-  { label: "Analytics",        Icon: BarChartIcon      },
-  { label: "Badges",           Icon: MedalIcon         },
-  { label: "Account Settings", Icon: SettingsIcon      },
+  { label: "Overview",         Icon: GridIcon     },
+  { label: "My Content",       Icon: FileIcon     },
+  { label: "Analytics",        Icon: BarChartIcon },
+  { label: "Badges",           Icon: MedalIcon    },
+  { label: "Account Settings", Icon: SettingsIcon },
 ];
 
 function ProfileTabs({ activeTab, setActiveTab }) {

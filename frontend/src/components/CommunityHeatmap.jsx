@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { fetchHeatmapStats } from "../api/faqApi";
-import { calculateRangeTotal, calculateTrendPercent } from "./communityHeatmapUtils";
+//import { calculateRangeTotal, calculateTrendPercent } from "./communityHeatmapUtils";
 import "./CommunityHeatmap.css";
 
 const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -236,8 +236,15 @@ const cellsToMap = (cells) => {
 // raw `data` array returned by the API and the static dataset maps.
 const sumInteractions = (rows) => {
   if (!rows) return 0;
-  if (Array.isArray(rows)) return calculateRangeTotal(rows);
-  return calculateRangeTotal(Object.values(rows));
+  //if (Array.isArray(rows)) return calculateRangeTotal(rows);
+  //return calculateRangeTotal(Object.values(rows));
+   const values = Array.isArray(rows) ? rows : Object.values(rows);
+   return values.reduce((total, row) => {
+    const interactions =
+      row.interactions ??
+      ((row.questions || 0) + (row.answers || 0));
+    return total + interactions;
+  }, 0);
 };
 
 // Compute the total interactions (questions + answers) for a given range's dataset
@@ -249,9 +256,9 @@ const computeRangeTotal = (rangeKey) => {
 
 // Compute the percentage change between two numeric totals.
 // Returns an object with the formatted string and a `positive` flag.
-const computeTrendPercent = (current, previous) => {
-  return calculateTrendPercent(current, previous);
-};
+//const computeTrendPercent = (current, previous) => {
+  //return calculateTrendPercent(current, previous);
+//};
 
 // Icons
 const CalendarIcon = () => (

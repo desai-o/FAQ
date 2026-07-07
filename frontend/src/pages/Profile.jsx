@@ -13,7 +13,7 @@ import QuickLinks from "../components/profile/QuickLinks";
 import { useAuth } from "../context/AuthContext";
 import { Link, useLocation } from "react-router-dom";
 import AnalyticsTab from "../components/profile/AnalyticsTab";
-import AnswersTab from "../components/profile/AnswersTab";
+import MyContentTab from "../components/profile/MyContentTab";
 import NotificationPreferences from "../components/profile/NotificationPreferences";
 
 // Storage key for persisting the selected tab across page refreshes.
@@ -132,10 +132,10 @@ function Profile() {
           )}
 
           {activeTab === "Analytics" && <AnalyticsTab />}
-          {activeTab === "Answers" && <AnswersTab />}
+          {activeTab === "My Content" && <MyContentTab />}
           {activeTab === "Account Settings" && <NotificationPreferences />}
 
-          {activeTab !== "Overview" && activeTab !== "Analytics" && activeTab !== "Answers" && activeTab !== "Account Settings" && (
+          {activeTab !== "Overview" && activeTab !== "Analytics" && activeTab !== "My Content" && activeTab !== "Account Settings" && (
             <div className="profile-card">
               <h2>{activeTab}</h2>
               <p>Content for {activeTab} will be implemented here.</p>

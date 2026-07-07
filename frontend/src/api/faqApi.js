@@ -93,6 +93,21 @@ export async function fetchUserRecentAnswers(userId, limit = 20) {
   );
 }
 
+export async function fetchUserFaqs(userId, limit = 20) {
+  return request(
+    `/faqs/user/${encodeURIComponent(userId)}?limit=${limit}`
+  );
+}
+
+// Fetch the logged-in user's UserQuery rows (drafts + resolved questions).
+// Pairs with `fetchUserFaqs` so the "My FAQs Created" profile tab can render
+// both FAQs and drafts without merging the two data models server-side.
+export async function fetchUserQueries(userId, limit = 20) {
+  return request(
+    `/queries/user/${encodeURIComponent(userId)}?limit=${limit}`
+  );
+}
+
 export async function toggleVote(payload) {
   return request("/votes", {
     method: "POST",

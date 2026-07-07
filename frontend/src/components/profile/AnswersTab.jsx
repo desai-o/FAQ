@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { fetchUserRecentAnswers } from "../../api/faqApi";
 import { MessageCircleIcon } from "./ProfileIcons";
@@ -52,7 +53,17 @@ function formatTimestamp(iso) {
     "Jan", "Feb", "Mar", "Apr", "May", "Jun",
     "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
   ];
-  return `${months[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
+    return `${months[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
+}
+
+// ID resolver that mirrors QuestionDetail's getQuestionId(): the answer
+// payload's questionId / queryId is already stringified by the backend, but
+// routing it through the same fallback chain keeps the link consistent with
+// the rest of the app and forward-compatible if the payload shape changes.
+function pickId(item) {
+  if (item == null) return "";
+  if (typeof item === "string") return item;
+  return String(item.id || item._id || item.mongo_id || "");
 }
 
 // Map the server's sourceType ("faq" | "query") onto the existing
@@ -70,6 +81,7 @@ function deriveSourceBadge(sourceType) {
 
 function AnswersTab() {
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   const [answers, setAnswers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -183,17 +195,38 @@ function AnswersTab() {
               const displayTitle = a.title || "Untitled question";
               const badge = deriveSourceBadge(a.sourceType);
               const time = formatTimestamp(a.createdAt);
+              // Reuse the existing /questions/:id route and pickId-based
+              // ID resolution so row-level navigation matches MyContent.
+              const linkTo = `/questions/${pickId(a.sourceType === "query" ? { id: a.queryId } : { id: a.questionId })}`;
 
               return (
-                <tr key={a.id} className="content-table-row">
+                <tr
+                  key={a.id}
+                  className="content-table-row"
+                  onClick={() => navigate(linkTo)}
+                  style={{ cursor: "pointer" }}
+                >
                   <td className="content-table-icon">
                     <MessageCircleIcon size={14} color="#cbd5e1" />
                   </td>
                   <td className="content-table-title">
-                    {displayTitle}
-                    <span className={`content-status ${badge.cls}`}>
-                      {badge.label}
-                    </span>
+                    <Link
+                      to={linkTo}
+                      onClick={(e) => e.stopPropagation()}
+                      style={{
+                        color: "inherit",
+                        textDecoration: "none",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "8px",
+                        flexWrap: "wrap"
+                      }}
+                    >
+                      {displayTitle}
+                      <span className={`content-status ${badge.cls}`}>
+                        {badge.label}
+                      </span>
+                    </Link>
                   </td>
                   <td className="content-table-stat">
                     <span className="stat-empty" title={a.createdAt || ""}>

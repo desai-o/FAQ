@@ -305,6 +305,68 @@ router.get("/", async (req, res) => {
   }
 });
 
+// Get queries owned by a specific user (drafts + resolved questions).
+// Mirrors `GET /faqs/user/:userId` so the "My FAQs Created" profile tab can
+// surface both FAQ rows and UserQuery rows without merging the two data
+// models. Status comes through to the client, which classifies entries as
+// draft (status='pending') vs published (status='resolved'); this keeps
+// `/faqs/user/:userId` untouched. No data model changes.
+router.get("/user/:userId", requireAuth, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { limit, offset } = getPagination(req.query);
+
+    if (isMongoAvailable()) {
+      const filter = { userId };
+      const [queries, total] = await Promise.all([
+        UserQuery.find(filter).sort({ createdAt: -1 }).skip(offset).limit(limit),
+        UserQuery.countDocuments(filter)
+      ]);
+
+      return success(res, {
+        storage: "mongodb",
+        data: queries,
+        meta: { pagination: { limit, offset, total } }
+      });
+    }
+
+    const db = getSQLiteDb();
+
+    const [queries, totalRow] = await Promise.all([
+      db.all(
+        `
+        SELECT *
+        FROM user_queries
+        WHERE user_id = ?
+        ORDER BY created_at DESC
+        LIMIT ?
+        OFFSET ?
+        `,
+        userId,
+        limit,
+        offset
+      ),
+      db.get(
+        "SELECT COUNT(*) AS total FROM user_queries WHERE user_id = ?",
+        userId
+      )
+    ]);
+
+    return success(res, {
+      storage: "sqlite",
+      data: queries,
+      meta: { pagination: { limit, offset, total: totalRow.total } }
+    });
+  } catch (error) {
+    return fail(res, {
+      statusCode: 500,
+      code: "USER_QUERIES_FETCH_FAILED",
+      message: "Failed to fetch user's queries",
+      details: error.message
+    });
+  }
+});
+
 router.patch("/:id/resolve", writeLimiter, validate(resolveQuerySchema), async (req, res) => {
   try {
     const { answer } = req.body;
