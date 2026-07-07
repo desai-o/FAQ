@@ -250,4 +250,171 @@ router.get("/me", requireAuth, async (req, res) => {
   });
 });
 
+// @route   PATCH api/auth/me
+// @desc    Update editable profile fields for the authenticated user
+// @access  Private
+//
+// Accepts any subset of { name, bio, location }. Each field is validated
+// for type and length. Updates are written to MongoDB when available AND
+// mirrored to the SQLite fallback so both storages stay in sync, matching
+// the storage-duality pattern used by /signup.
+//
+// Note: req.user from requireAuth does NOT yet include bio/location (the
+// resolveUserById middleware still returns the original field set), so the
+// response is built from { ...req.user, ...updates } to echo back the new
+// values without requiring a fresh DB read.
+router.patch("/me", requireAuth, async (req, res) => {
+  try {
+    const { name, bio, location, username } = req.body || {};
+    const updates = {};
+
+    if (name !== undefined) {
+      if (typeof name !== "string" || name.trim() === "" || name.length > 80) {
+        return fail(res, {
+          statusCode: 400,
+          code: "VALIDATION_ERROR",
+          message: "Name must be between 1 and 80 characters"
+        });
+      }
+      updates.name = name.trim();
+    }
+
+    if (bio !== undefined) {
+      if (typeof bio !== "string" || bio.length > 500) {
+        return fail(res, {
+          statusCode: 400,
+          code: "VALIDATION_ERROR",
+          message: "Bio must be 500 characters or fewer"
+        });
+      }
+      updates.bio = bio;
+    }
+
+    if (location !== undefined) {
+      if (typeof location !== "string" || location.length > 80) {
+        return fail(res, {
+          statusCode: 400,
+          code: "VALIDATION_ERROR",
+          message: "Location must be 80 characters or fewer"
+        });
+      }
+      updates.location = location;
+    }
+
+    // Username is a separate editable display handle (distinct from `name`).
+    // Validated for type + format + length, lowercased for storage, and
+    // checked against other users so two accounts don't share a handle.
+    if (username !== undefined) {
+      if (typeof username !== "string") {
+        return fail(res, {
+          statusCode: 400,
+          code: "VALIDATION_ERROR",
+          message: "Username must be a string"
+        });
+      }
+      const trimmedUsername = username.trim();
+      if (trimmedUsername.length < 3 || trimmedUsername.length > 30) {
+        return fail(res, {
+          statusCode: 400,
+          code: "VALIDATION_ERROR",
+          message: "Username must be between 3 and 30 characters"
+        });
+      }
+      if (!/^[a-zA-Z0-9_-]+$/.test(trimmedUsername)) {
+        return fail(res, {
+          statusCode: 400,
+          code: "VALIDATION_ERROR",
+          message: "Username can only contain letters, numbers, underscores, and dashes"
+        });
+      }
+      const normalizedUsername = trimmedUsername.toLowerCase();
+      const currentUsername = (req.user.username || "").toLowerCase();
+      if (normalizedUsername !== currentUsername) {
+        let conflict = false;
+        if (isMongoAvailable()) {
+          const existing = await User.findOne({
+            username: normalizedUsername,
+            _id: { $ne: req.user.id }
+          });
+          if (existing) conflict = true;
+        } else {
+          try {
+            const db = getSQLiteDb();
+            const existing = await db.get(
+              `SELECT id FROM users WHERE LOWER(username) = LOWER(?) AND id != ?`,
+              normalizedUsername,
+              req.user.sqliteId || 0
+            );
+            if (existing) conflict = true;
+          } catch (sqLiteErr) {
+            console.error("Failed to check username uniqueness in SQLite:", sqLiteErr.message);
+          }
+        }
+        if (conflict) {
+          return fail(res, {
+            statusCode: 409,
+            code: "USERNAME_TAKEN",
+            message: "That username is already taken"
+          });
+        }
+      }
+      updates.username = normalizedUsername;
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return fail(res, {
+        statusCode: 400,
+        code: "VALIDATION_ERROR",
+        message: "No editable fields provided"
+      });
+    }
+
+    // Mongo update (source of truth when available).
+    if (isMongoAvailable()) {
+      try {
+        await User.findByIdAndUpdate(req.user.id, { $set: updates });
+      } catch (mongoErr) {
+        console.error("Mongo profile update failed:", mongoErr.message);
+      }
+    }
+
+    // SQLite mirror. The row's identity depends on which storage resolved
+    // the user: SQLite-only users are keyed by row id, Mongo users are
+    // mirrored by mongo_id.
+    try {
+      const db = getSQLiteDb();
+      const setClauses = [];
+      const params = [];
+      for (const [key, value] of Object.entries(updates)) {
+        setClauses.push(`${key} = ?`);
+        params.push(value);
+      }
+      const matchColumn = req.user.storage === "sqlite" ? "id" : "mongo_id";
+      const matchValue =
+        req.user.storage === "sqlite" ? req.user.sqliteId : req.user.id;
+      params.push(matchValue);
+      await db.run(
+        `UPDATE users SET ${setClauses.join(", ")} WHERE ${matchColumn} = ?`,
+        ...params
+      );
+    } catch (sqLiteErr) {
+      console.error("Failed to sync profile update to SQLite:", sqLiteErr.message);
+    }
+
+    const freshUser = { ...req.user, ...updates };
+    return success(res, {
+      storage: req.user.storage || "mongodb",
+      data: freshUser,
+      meta: { user: freshUser }
+    });
+  } catch (error) {
+    return fail(res, {
+      statusCode: 500,
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Profile update failed",
+      details: error.message
+    });
+  }
+});
+
 module.exports = router;
