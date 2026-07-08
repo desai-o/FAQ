@@ -44,6 +44,23 @@ const userSchema = new mongoose.Schema(
     cohort: {
       type: String,
       default: ""
+    },
+    bio: {
+      type: String,
+      default: ""
+    },
+    location: {
+      type: String,
+      default: ""
+    },
+    // Display handle, separate from `name`. Edited via the Edit Profile
+    // form and validated/lowercased in the PATCH /auth/me route. Empty by
+    // default so legacy users render a fallback in the UI.
+    username: {
+      type: String,
+      default: "",
+      trim: true,
+      lowercase: true
     }
   },
   {

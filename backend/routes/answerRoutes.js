@@ -303,6 +303,115 @@ router.post("/", requireAuth, writeLimiter, validate(createAnswerSchema), async 
   }
 });
 
+// Get recent answers by a specific user (for profile activity feed).
+// Registered before `/:questionId` so Express does not match the literal
+// segment "user" as a questionId parameter.
+router.get("/user/:userId", requireAuth, async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    // Only the user themselves, or admin/moderator, may see this list.
+    if (
+      req.user.id !== userId &&
+      req.user.role !== "admin" &&
+      req.user.role !== "moderator"
+    ) {
+      return fail(res, {
+        statusCode: 403,
+        code: "FORBIDDEN",
+        message: "You are not allowed to view this activity"
+      });
+    }
+
+    const limit = Math.min(
+      50,
+      Math.max(1, parseInt(req.query.limit, 10) || 20)
+    );
+
+    if (isMongoAvailable()) {
+      const answers = await Answer.find({ userId })
+        .sort({ createdAt: -1 })
+        .limit(limit)
+        .lean();
+
+      // Hydrate parent question titles (FAQ or UserQuery).
+      const data = await Promise.all(
+        answers.map(async (a) => {
+          let title = null;
+          let sourceType = null;
+          if (a.questionId) {
+            const faq = await FAQ.findById(a.questionId)
+              .select("question")
+              .lean();
+            if (faq) {
+              title = faq.question;
+              sourceType = "faq";
+            }
+          } else if (a.queryId) {
+            const uq = await UserQuery.findById(a.queryId)
+              .select("question")
+              .lean();
+            if (uq) {
+              title = uq.question;
+              sourceType = "query";
+            }
+          }
+          return {
+            id: String(a._id),
+            questionId: a.questionId ? String(a.questionId) : null,
+            queryId: a.queryId ? String(a.queryId) : null,
+            title,
+            sourceType,
+            createdAt: a.createdAt
+          };
+        })
+      );
+
+      return success(res, { storage: "mongodb", data });
+    }
+
+    const db = getSQLiteDb();
+
+    const rows = await db.all(
+      `
+      SELECT
+        a.id            AS id,
+        a.question_id   AS question_id,
+        a.query_id      AS query_id,
+        a.created_at    AS created_at,
+        f.question      AS faq_title,
+        q.question      AS query_title
+      FROM answers a
+      LEFT JOIN faqs         f ON f.id = a.question_id
+      LEFT JOIN user_queries q ON q.id = a.query_id
+      WHERE a.user_id = ?
+      ORDER BY a.created_at DESC
+      LIMIT ?
+      `,
+      userId,
+      limit
+    );
+
+    const data = rows.map((r) => ({
+      id: String(r.id),
+      questionId: r.question_id ? String(r.question_id) : null,
+      queryId: r.query_id ? String(r.query_id) : null,
+      title: r.faq_title || r.query_title || null,
+      sourceType: r.question_id ? "faq" : r.query_id ? "query" : null,
+      createdAt: r.created_at
+    }));
+
+    return success(res, { storage: "sqlite", data });
+  } catch (error) {
+    return fail(res, {
+      statusCode: 500,
+      code: "USER_ANSWERS_FETCH_FAILED",
+      message: "Failed to fetch user answers",
+      details: error.message
+    });
+  }
+});
+
 router.get("/query/:queryId", async (req, res) => {
   try {
     const { queryId } = req.params;

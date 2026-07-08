@@ -19,11 +19,13 @@ async function resolveUserById(decodedId) {
       return {
         id: user._id.toString(),
         name: user.name,
+        username: user.username || "",
         email: user.email,
         role: user.role || "student",
         questionsCount: user.questionsCount || 0,
         answersCount: user.answersCount || 0,
         reputation: user.reputation || 0,
+        badges: user.badges || [],
         storage: "mongodb"
       };
     }
@@ -48,11 +50,13 @@ async function resolveUserById(decodedId) {
     id: sqliteUser.mongo_id || String(sqliteUser.id),
     sqliteId: sqliteUser.id,
     name: sqliteUser.name,
+    username: sqliteUser.username || "",
     email: sqliteUser.email,
     role: sqliteUser.role || "student",
     questionsCount: sqliteUser.questions_count || 0,
     answersCount: sqliteUser.answers_count || 0,
     reputation: sqliteUser.reputation || 0,
+    badges: sqliteUser.badges ? sqliteUser.badges.split(",").filter(Boolean) : [],
     storage: "sqlite"
   };
 }

@@ -135,10 +135,10 @@ function ProfileDropdown({ isOpen, onClose }) {
           </li>
         )}
         <li>
-          <a href="#questions" onClick={(e) => { e.preventDefault(); onClose(); }}>
+          <Link to="/profile" state={{ activeTab: "My Content" }} onClick={onClose}>
             <MessageSquareIcon />
             <span>My Questions</span>
-          </a>
+          </Link>
         </li>
         <li>
           <Link to="/bookmarks" onClick={onClose}>

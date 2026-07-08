@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { Link } from "react-router-dom";
 import { Chart, registerables } from "chart.js";
 Chart.register(...registerables);
 
@@ -259,7 +260,7 @@ export default function Analytics() {
           <span style={c.cardTitle}>
             Top FAQ <span style={{ fontWeight:400, color:"#6b7280", fontSize:13 }}>(by views)</span>
           </span>
-          <button style={c.viewAll}>View all</button>
+          <Link to="/questions" style={c.viewAll}>View all</Link>
         </div>
         <div style={c.faqRow}>
           <div style={c.faqIconBox}><IconFile /></div>
@@ -278,7 +279,7 @@ export default function Analytics() {
       <div style={c.card}>
         <div style={c.cardHead}>
           <span style={c.cardTitle}>Content Performance</span>
-          <button style={c.viewAll}>View all</button>
+          <Link to="/contributors" style={c.viewAll}>View all</Link>
         </div>
         <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
           {contentPerformance.map((item) => (
@@ -297,7 +298,7 @@ export default function Analytics() {
       <div style={c.card}>
         <div style={c.cardHead}>
           <span style={c.cardTitle}>Audience Engagement</span>
-          <button style={c.viewAll}>View all</button>
+          <Link to="/dashboard" style={c.viewAll}>View all</Link>
         </div>
         <div>
           {audienceData.map((item, i) => (

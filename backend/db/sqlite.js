@@ -71,6 +71,7 @@ async function connectSQLite() {
       role TEXT DEFAULT 'student',
       badges TEXT DEFAULT '',
       cohort TEXT DEFAULT '',
+      username TEXT DEFAULT '',
       questions_count INTEGER DEFAULT 0,
       answers_count INTEGER DEFAULT 0,
       reputation INTEGER DEFAULT 0,

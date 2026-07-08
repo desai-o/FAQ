@@ -106,6 +106,68 @@ router.get("/", async (req, res) => {
   }
 });
 
+// Get FAQs created by a specific user.
+// Mirrors GET /answers/user/:userId in answerRoutes.js so the
+// profile page can reuse the same shape.
+router.get("/user/:userId", requireAuth, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { limit } = getPagination(req.query);
+
+    if (isMongoAvailable()) {
+      const data = await FAQ.find({ userId })
+        .sort({ createdAt: -1 })
+        .limit(limit);
+
+      return success(res, { storage: "mongodb", data });
+    }
+
+    const db = getSQLiteDb();
+
+    const rows = await db.all(
+      `
+      SELECT
+        id,
+        question,
+        category,
+        tags,
+        user_id,
+        author_name,
+        created_at,
+        moderation_status
+      FROM faqs
+      WHERE user_id = ?
+      ORDER BY created_at DESC
+      LIMIT ?
+      `,
+      userId,
+      limit
+    );
+
+    const data = rows.map((r) => ({
+      id: String(r.id),
+      title: r.question,
+      category: r.category || "General",
+      tags: typeof r.tags === "string" && r.tags.length
+        ? r.tags.split(",").map((t) => t.trim()).filter(Boolean)
+        : [],
+      userId: r.user_id,
+      authorName: r.author_name || "Anonymous",
+      createdAt: r.created_at,
+      moderationStatus: r.moderation_status
+    }));
+
+    return success(res, { storage: "sqlite", data });
+  } catch (error) {
+    return fail(res, {
+      statusCode: 500,
+      code: "USER_FAQS_FETCH_FAILED",
+      message: "Failed to fetch user FAQs",
+      details: error.message
+    });
+  }
+});
+
 router.post("/", writeLimiter, validate(createFaqSchema), async (req, res) => {
   try {
     const { question, answer, category, tags } = req.body;

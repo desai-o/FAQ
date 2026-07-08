@@ -1268,18 +1268,8 @@ const handleSubmitReply = async () => {
                     {activeBounty && (String(activeBounty.createdBy) === String(user?.id) || user?.role === "admin") && (
                       <button
                         onClick={() => handleAwardBounty(answer.id)}
-                        className="bounty-award-btn"
-                        style={{
-                          marginLeft: canDelete(answer) ? "10px" : "auto",
-                          padding: "6px 12px",
-                          borderRadius: "6px",
-                          backgroundColor: "#f59e0b",
-                          color: "#fff",
-                          border: "none",
-                          cursor: "pointer",
-                          fontWeight: "bold",
-                          fontSize: "12px"
-                        }}
+                        className="bookmark-btn"
+                        style={{ marginLeft: "12px" }}
                       >
                         🏆 Award Bounty ({activeBounty.amount} pts)
                       </button>

@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect } from "react";
+import { updateUserProfile } from "../api/faqApi";
 
 const AuthContext = createContext();
 
@@ -125,8 +126,60 @@ export function AuthProvider({ children }) {
     setError(null);
   };
 
+  // Increment the current user's `answersCount` in local state so the
+  // Profile page reflects new submissions immediately, without requiring a
+  // full reload to re-fetch /auth/me. Backend remains the source of truth
+  // for the absolute value; this only keeps the UI snapshot in sync.
+  const incrementAnswersCount = () => {
+    setUser((prev) => {
+      if (!prev) return prev;
+      const current = Number(prev.answersCount) || 0;
+      return { ...prev, answersCount: current + 1 };
+    });
+  };
+
+  // Increment the current user's `questionsCount` in local state so the
+  // Profile page's "FAQs Created" stat updates immediately after posting
+  // a new question, without waiting for a full reload to re-fetch
+  // /auth/me. Mirrors `incrementAnswersCount` exactly — backend stays the
+  // source of truth for the absolute value, this just keeps the UI
+  // snapshot in sync between server refreshes.
+  const incrementQuestionsCount = () => {
+    setUser((prev) => {
+      if (!prev) return prev;
+      const current = Number(prev.questionsCount) || 0;
+      return { ...prev, questionsCount: current + 1 };
+    });
+  };
+
+  // Persist a profile update (name, bio, location) to the server and merge
+  // the returned user object into local state so the Profile page reflects
+  // the new values immediately. The /auth/me PATCH response uses the same
+  // { data, meta: { user } } shape as /me, so we read defensively.
+  const updateProfile = async (payload) => {
+    const response = await updateUserProfile(payload);
+    const updatedUser =
+      response?.data?.data || response?.data?.meta?.user || response?.data;
+    if (updatedUser && typeof updatedUser === "object") {
+      setUser(updatedUser);
+    }
+    return updatedUser;
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, error, login, signup, logout }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        error,
+        login,
+        signup,
+        logout,
+        incrementAnswersCount,
+        incrementQuestionsCount,
+        updateProfile
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

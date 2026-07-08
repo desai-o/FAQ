@@ -13,18 +13,47 @@ import QuickLinks from "../components/profile/QuickLinks";
 import { useAuth } from "../context/AuthContext";
 import { Link, useLocation } from "react-router-dom";
 import AnalyticsTab from "../components/profile/AnalyticsTab";
+import MyContentTab from "../components/profile/MyContentTab";
 import NotificationPreferences from "../components/profile/NotificationPreferences";
+
+// Storage key for persisting the selected tab across page refreshes.
+// Kept local to Profile so it can't collide with anything else.
+const PROFILE_TAB_STORAGE_KEY = "profileActiveTab";
 
 function Profile() {
   const location = useLocation();
-  const [activeTab, setActiveTab] = useState(
-    location.state?.activeTab || "Overview");
+  const [activeTab, setActiveTab] = useState(() => {
+    // Restore the user's tab from sessionStorage first so that a hard
+    // refresh keeps them where they were. Falls back to navigation
+    // state (used by Links that open Profile on a specific tab) and
+    // finally to the default "Overview" tab.
+    try {
+      const stored = sessionStorage.getItem(PROFILE_TAB_STORAGE_KEY);
+      if (stored) return stored;
+    } catch (_) {
+      // sessionStorage may be unavailable (private mode, SSR, etc.) —
+      // fall through to the navigation/default logic.
+    }
+    return location.state?.activeTab || "Overview";
+  });
 
     useEffect(() => {
   if (location.state?.activeTab) {
     setActiveTab(location.state.activeTab);
   }
 }, [location.state]);
+
+  // Mirror the current tab into sessionStorage on every change so that
+  // a refresh always rehydrates from the same key on mount. Writes are
+  // wrapped in try/catch because sessionStorage can throw (e.g. storage
+  // quota, disabled cookies in some sandboxed contexts).
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(PROFILE_TAB_STORAGE_KEY, activeTab);
+    } catch (_) {
+      // best-effort; refreshing will just fall back to Overview
+    }
+  }, [activeTab]);
 
   const { user, loading } = useAuth();
 
@@ -103,9 +132,10 @@ function Profile() {
           )}
 
           {activeTab === "Analytics" && <AnalyticsTab />}
+          {activeTab === "My Content" && <MyContentTab />}
           {activeTab === "Account Settings" && <NotificationPreferences />}
 
-          {activeTab !== "Overview" && activeTab !== "Analytics" && activeTab !== "Account Settings" && (
+          {activeTab !== "Overview" && activeTab !== "Analytics" && activeTab !== "My Content" && activeTab !== "Account Settings" && (
             <div className="profile-card">
               <h2>{activeTab}</h2>
               <p>Content for {activeTab} will be implemented here.</p>

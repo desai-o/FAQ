@@ -87,6 +87,27 @@ export async function fetchAnswers(questionId, limit = 20, offset = 0) {
   return request(`/answers/${questionId}?limit=${limit}&offset=${offset}`);
 }
 
+export async function fetchUserRecentAnswers(userId, limit = 20) {
+  return request(
+    `/answers/user/${encodeURIComponent(userId)}?limit=${limit}`
+  );
+}
+
+export async function fetchUserFaqs(userId, limit = 20) {
+  return request(
+    `/faqs/user/${encodeURIComponent(userId)}?limit=${limit}`
+  );
+}
+
+// Fetch the logged-in user's UserQuery rows (drafts + resolved questions).
+// Pairs with `fetchUserFaqs` so the "My FAQs Created" profile tab can render
+// both FAQs and drafts without merging the two data models server-side.
+export async function fetchUserQueries(userId, limit = 20) {
+  return request(
+    `/queries/user/${encodeURIComponent(userId)}?limit=${limit}`
+  );
+}
+
 export async function toggleVote(payload) {
   return request("/votes", {
     method: "POST",
@@ -159,6 +180,16 @@ export async function deleteAnswer(id) {
 
 export async function updateAnswer(id, payload) {
   return request(`/answers/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload)
+  });
+}
+
+// Update the authenticated user's editable profile fields (name, bio,
+// location). Calls PATCH /auth/me; the response echoes the updated user
+// under .data / .meta.user, matching the rest of the auth endpoints.
+export async function updateUserProfile(payload) {
+  return request("/auth/me", {
     method: "PATCH",
     body: JSON.stringify(payload)
   });
