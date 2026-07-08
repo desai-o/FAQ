@@ -104,26 +104,6 @@ function Landing() {
     };
   }, []);
 
-  const handleCopyWidget = () => {
-    const codeText = `<!-- CrowdFAQ Floating Widget -->
-<script 
-  src="http://localhost:5173/widget.js" 
-  data-site-id="crowdfaq-100" 
-  async
-></script>`;
-    
-    navigator.clipboard.writeText(codeText).then(() => {
-      const copyBtn = document.querySelector(".landing-copy-btn");
-      if (copyBtn) {
-        const originalText = copyBtn.innerText;
-        copyBtn.innerText = "Copied!";
-        setTimeout(() => {
-          copyBtn.innerText = originalText;
-        }, 2000);
-      }
-    });
-  };
-
   const isDark = theme === "dark";
 
   return (
@@ -356,7 +336,7 @@ function Landing() {
             <p style={{ color: "var(--text-secondary)", lineHeight: 1.5, marginBottom: 20, fontSize: "14px" }}>
               CrowdFAQ unites active community experts with AI capabilities to construct a real-time, automated knowledge base.
             </p>
-            
+
             {/* Visually Redesigned Workflow Steps */}
             <div className="workflow-steps-list">
               <div className="community-step">
@@ -417,73 +397,28 @@ function Landing() {
               </button>
             </div>
             <div style={{ display: "flex", gap: 6, padding: "0 16px 12px", background: "var(--bg-white)", flexWrap: "wrap" }}>
-              <button 
-                className="btn" 
+              <button
+                className="btn"
                 style={{ fontSize: "10px", padding: "4px 8px", background: "var(--bg-page)", border: "1px solid var(--border)", borderRadius: "4px" }}
                 onClick={() => handleSendMessage("How does integration work?")}
               >
                 Try "integration"
               </button>
-              <button 
-                className="btn" 
+              <button
+                className="btn"
                 style={{ fontSize: "10px", padding: "4px 8px", background: "var(--bg-page)", border: "1px solid var(--border)", borderRadius: "4px" }}
                 onClick={() => handleSendMessage("Tell me about human support")}
               >
                 Try "human support"
               </button>
-              <button 
-                className="btn" 
+              <button
+                className="btn"
                 style={{ fontSize: "10px", padding: "4px 8px", background: "var(--bg-page)", border: "1px solid var(--border)", borderRadius: "4px" }}
                 onClick={() => handleSendMessage("What are detailed FAQs?")}
               >
                 Try "detailed FAQs"
               </button>
             </div>
-          </div>
-        </div>
-      </section>
-
-      <hr className="gradient-divider" />
-
-      {/* Download Extension Banner */}
-      <section className="landing-extension-banner scroll-fade-in">
-        <div className="landing-extension-banner-container">
-          <h2 className="landing-extension-banner-title">⚡ Available as a Browser Extension — Get CrowdFAQ answers anywhere on the web</h2>
-          <div className="landing-extension-banner-btns">
-            <button className="btn btn-chrome" onClick={() => alert('Chrome Extension download starts soon!')}>
-              <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24" style={{ marginRight: "8px" }}><path d="M12 0C5.37 0 0 5.37 0 12s5.37 12 12 12 12-5.37 12-12S18.63 0 12 0zm0 3.6c2.3 0 4.3.9 5.8 2.4l-7.7 7.7-3.9-3.9c-.8-.8-.8-2 0-2.8l1.4-1.4c.8-.8 2-.8 2.8 0l1.6 1.6 4.9-4.9c-1.4-1-3.1-1.6-4.9-1.6zm0 16.8c-4.6 0-8.4-3.8-8.4-8.4s3.8-8.4 8.4-8.4 8.4 3.8 8.4 8.4-3.8 8.4-8.4 8.4z"/></svg>
-              Add to Chrome
-            </button>
-            <button className="btn btn-firefox" onClick={() => alert('Firefox Add-on download starts soon!')}>
-              <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24" style={{ marginRight: "8px" }}><path d="M12 0C5.37 0 0 5.37 0 12s5.37 12 12 12 12-5.37 12-12S18.63 0 12 0zm.8 4.2c.4 0 .8.1 1.2.3.8.4 1.4 1.1 1.7 2 .4.8.4 1.8.1 2.7l.5.3c1-.6 2.3-.9 3.5-.8-.8-2-2.3-3.6-4.2-4.5l-2.8 0zm-7.3 4c1-.8 2.3-1.3 3.6-1.3.8 0 1.6.2 2.3.6l-.3.6c-.6 1.1-.6 2.4-.1 3.5.4 1 1.2 1.8 2.2 2.2l-.6 1.1c-.8.8-1.9 1.3-3.1 1.3-2.2 0-4.1-1.5-4.6-3.6-.6-2 .1-4.1 1.6-4.4zm6.5 11.6c-4 0-7.3-3.3-7.3-7.3s3.3-7.3 7.3-7.3 7.3 3.3 7.3 7.3-3.3 7.3-7.3 7.3zm.8-11.4c-.4 0-.8.2-1.1.5-.3.3-.5.7-.5 1.1s.2.8.5 1.1c.3.3.7.5 1.1.5s.8-.2 1.1-.5c.3-.3.5-.7.5-1.1s-.2-.8-.5-1.1c-.3-.3-.7-.5-1.1-.5z"/></svg>
-              Add to Firefox
-            </button>
-          </div>
-        </div>
-      </section>
-
-      <hr className="gradient-divider" />
-
-      {/* Widget Integration Section */}
-      <section id="extension" className="landing-extension-section scroll-fade-in">
-        <div className="landing-extension-card">
-          <div className="landing-extension-info">
-            <h2>Embed CrowdFAQ on Any Website</h2>
-            <p>Integrate our floating widget code block directly into your HTML. Allow your readers to search FAQ items or submit custom questions directly from your own website.</p>
-            <button className="btn btn-primary" onClick={handleCopyWidget}>Copy Widget Code</button>
-          </div>
-          <div className="landing-code-container">
-            <button className="landing-copy-btn" onClick={handleCopyWidget}>Copy</button>
-            <pre>
-              <code>
-{`<!-- CrowdFAQ Floating Widget -->
-<script 
-  src="http://localhost:5173/widget.js" 
-  data-site-id="crowdfaq-100" 
-  async
-></script>`}
-              </code>
-            </pre>
           </div>
         </div>
       </section>
